@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include <unordered_map>
+#include <map>
 #include <iostream>
 #include <list>
 
@@ -19,7 +20,8 @@ enum tokens
 	TK_MULT,
 	TK_BOOL,
 	TK_BROP,
-	TK_BRCL
+	TK_BRCL,
+	TK_END
 };
 
 struct token
@@ -38,42 +40,69 @@ enum expressions
 {
 	EX_VALUE,
 	EX_MULT,
-	EX_ADD
+	EX_ADD,
+	EX_EMPTY,
+	EX_E,
+	EX_T,
+	EX_ACCEPT
 };
 
-/*
-struct ASTnode
+struct symbol
 {
-	union
-	{
-		tokens oprtr; //valid only if children are non-null
-		bool value;
-	};
-	ASTnode* left_child;
-	ASTnode* right_child;
-
-	ASTnode() : left_child( NULL ), right_child( NULL ) {}
-};*/
-
-struct LR_stack_item
-{
-	bool expr_or_tok; //0 = expression, 1 = token
+	bool expr_or_tok; //token is true, expression is false
 	union //depending on bool expr_or_tok
 	{
 		tokens tk;
 		expressions expr;
 	};
 
+	void insert_tok( tokens tki )
+	{
+		expr_or_tok = true;
+		tk = tki;
+	}
+	void insert_exp( expressions ex )
+	{
+		expr_or_tok = false;
+		expr = ex;
+	}
+
+	symbol() {}
+	symbol( tokens tki ) : expr_or_tok( true ), tk( tki ) {}
+	symbol( expressions ex ) : expr_or_tok( true ), expr( ex ) {}
+
+	bool operator < ( const symbol& other ) const
+	{
+		if( other.expr_or_tok != expr_or_tok )
+		{
+			return expr_or_tok;
+		}
+		if( expr_or_tok )
+		{
+			return other.expr < expr;
+		}
+		return other.tk < tk;
+	}
+};
+
+struct LR_stack_item
+{
+	symbol smb;
+
 	//since this parser doesn't need to keep a real AST,
 	//this serves as an "accumulator"
 	bool current_value; 
 
-	/*//the root of the AST is the operation that gets executed last
-	//the subtrees are the operands
-	ASTnode* AST;
+	int state;
 
-	LR_stack_item() : AST( NULL ) {}
-	*/
+	void insert_tok( tokens tki )
+	{
+		smb.insert_tok( tki );
+	}
+	void insert_exp( expressions ex )
+	{
+		smb.insert_exp( ex );
+	}
 };
 
 struct possible_token
@@ -93,7 +122,7 @@ struct possible_token
 struct parser_rule
 {
 	expressions result_exp;
-	vector < LR_stack_item > to_match;
+	int num_to_pop;
 };
 
 class incremental_lexer
@@ -109,10 +138,11 @@ public:
 		token_map.insert( make_pair( '1', TK_BOOL ) );
 		token_map.insert( make_pair( '(', TK_BROP ) );
 		token_map.insert( make_pair( ')', TK_BRCL ) );
+		token_map.insert( make_pair( '\n', TK_END ) );
 	}
 
 	//for every new input character, the lexer outputs zero or one token
-	//For our language, there is no need for state in the lexer
+	//For our language, there is no need for state in the lexer, since all tokens are 1 char wide
 	possible_token lexer( char in )
 	{
 		possible_token out;
@@ -120,6 +150,17 @@ public:
 		if( it_finder != token_map.end() )
 		{
 			out.set_token( token( it_finder->second, in ) );
+			if( it_finder->second == TK_BOOL )
+			{
+				if( in == '0' )
+				{
+					out.tk.data_b = false;
+				}
+				else
+				{
+					out.tk.data_b = true;
+				}
+			}
 		}
 		else
 		{
@@ -132,12 +173,28 @@ public:
 	}
 };
 
+struct parse_table_item
+{
+	bool shift_or_reduce; //false=shift, true=reduce
+	union
+	{
+		int new_state;
+		int reduce_rule;
+	};
+
+	parse_table_item() {}
+	parse_table_item( bool sr, int st ) : shift_or_reduce( sr ), new_state( st ) {}
+};
+
 class incremental_parser
 {
-	//simple LR parser. 
-	//Logic: for every token, it shifts the token onto the stack
-	//Then, it tries reducing the stack via the grammar rules
-	//note: multiple reductions may be needed per one shift
+public:
+	bool final_value;
+
+private:
+	static const int NUM_STATES = 11;
+
+	//simple SLR(1) parser. 
 
 	vector< parser_rule > rules;
 	list< LR_stack_item> item_stack; //using a list because we need access to all elements
@@ -145,21 +202,27 @@ class incremental_parser
 	unordered_map< tokens, char > debug_map;
 	unordered_map< expressions, char > debug_map2;
 
+	//map and not an unordred_map because I'm too lazy to write a hasher helper
+	//C++ can't figure out a default hash function for non-primitive types
+	vector< map< symbol, parse_table_item > > parse_table;
+
+	int offset_state;
+
 	void debug_print_arr()
 	{
 		for( list<LR_stack_item>::iterator it = item_stack.begin(); it != item_stack.end(); ++it )
 		{
-			if( it->expr_or_tok )
+			if( it->smb.expr_or_tok )
 			{
-				printf( "%c", debug_map[it->tk] );
-				if( it->tk == TK_BOOL )
+				printf( "%c", debug_map[it->smb.tk] );
+				if( it->smb.tk == TK_BOOL )
 				{
 					printf( "%d", it->current_value );
 				}
 			}
 			else
 			{
-				printf( "%c%d", debug_map2[it->expr], it->current_value );
+				printf( "%c-%d-%d", debug_map2[it->smb.expr], it->current_value, it->state );
 			}
 			printf( " " );
 		}
@@ -169,161 +232,207 @@ class incremental_parser
 public:
 	incremental_parser()
 	{
-		//EBNF-ish notation. I'm trying to keep it left-recursive to minimize stack space
+		offset_state = 0;
+
+		//EBNF-ish notation.
 		//I'm assuming the typical algebraic operator precedence:
-		//brackets take precedence over multiplication, which in turn takes precedence over
-		//addition.
+		//brackets take precedence over multiplication, which in turn takes precedence over addition
+
 		//MULT -> VALUE | MULT mult_op VALUE
 		//ADD -> ADD plus_op MULT | MULT
 		//VALUE -> ( ADD )
-		
+
 		debug_map.insert( make_pair( TK_PLUS, '+' ) );
 		debug_map.insert( make_pair( TK_MULT, '*' ) );
 		debug_map.insert( make_pair( TK_BOOL, 'B' ) );
 		debug_map.insert( make_pair( TK_BROP, '(' ) );
 		debug_map.insert( make_pair( TK_BRCL, ')' ) );
+		debug_map.insert( make_pair( TK_END, '/' ) );
 
 		debug_map2.insert( make_pair( EX_VALUE, 'V' ) );
 		debug_map2.insert( make_pair( EX_MULT, 'M' ) );
 		debug_map2.insert( make_pair( EX_ADD, 'A' ) );
-			
+		debug_map2.insert( make_pair( EX_EMPTY, '\\' ) );
+		debug_map2.insert( make_pair( EX_E, 'E' ) );
+		debug_map2.insert( make_pair( EX_T, 'T' ) );
+		
+		parse_table.resize( NUM_STATES );
+		parse_table[0].insert( make_pair( symbol(TK_BOOL), parse_table_item( false, 4 ) ) );
+		parse_table[0].insert( make_pair( symbol( TK_BROP), parse_table_item( false, 3 ) ) );
+		parse_table[0].insert( make_pair( symbol( EX_E ), parse_table_item( false, 1 ) ) );
+		parse_table[0].insert( make_pair( symbol( EX_T ), parse_table_item( false, 2 ) ) );
+
+		parse_table[1].insert( make_pair( symbol( EX_ACCEPT ), parse_table_item( false, 0 ) ) );
+		
+		parse_table[2].insert( make_pair( symbol( TK_PLUS ), parse_table_item( false, 5 ) ) );
+		parse_table[2].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 1 ) ) );
+		parse_table[2].insert( make_pair( symbol( TK_END ), parse_table_item( true, -1 ) ) );
+
+		parse_table[3].insert( make_pair( symbol( TK_BOOL ), parse_table_item( false, 4 ) ) );
+		parse_table[3].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 3 ) ) );
+		parse_table[3].insert( make_pair( symbol( EX_E ), parse_table_item( false, 6 ) ) );
+		parse_table[3].insert( make_pair( symbol( EX_T ), parse_table_item( false, 2 ) ) );
+
+		parse_table[4].insert( make_pair( symbol( TK_MULT ), parse_table_item( false, 7 ) ) );
+		parse_table[4].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 3 ) ) );
+		parse_table[4].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 3 ) ) );
+		parse_table[4].insert( make_pair( symbol( TK_END ), parse_table_item( true, 3 ) ) );
+
+		parse_table[5].insert( make_pair( symbol( TK_BOOL ), parse_table_item( false, 4 ) ) );
+		parse_table[5].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 3 ) ) );
+		parse_table[5].insert( make_pair( symbol( EX_E ), parse_table_item( false, 8 ) ) );
+		parse_table[5].insert( make_pair( symbol( EX_T ), parse_table_item( false, 2 ) ) );
+
+		parse_table[6].insert( make_pair( symbol( TK_BRCL ), parse_table_item( false, 9 ) ) );
+
+		parse_table[7].insert( make_pair( symbol( TK_BOOL ), parse_table_item( false, 4 ) ) );
+		parse_table[7].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 3 ) ) );
+		parse_table[7].insert( make_pair( symbol( EX_T ), parse_table_item( false, 10 ) ) );
+
+		parse_table[8].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 0 ) ) );
+		parse_table[8].insert( make_pair( symbol( TK_END ), parse_table_item( true, 0 ) ) );
+
+		parse_table[9].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 4 ) ) );
+		parse_table[9].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 4 ) ) );
+		parse_table[9].insert( make_pair( symbol( TK_END ), parse_table_item( true, 4 ) ) );
+
+		parse_table[10].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 2 ) ) );
+		parse_table[10].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 2 ) ) );
+		parse_table[10].insert( make_pair( symbol( TK_END ), parse_table_item( true, 2 ) ) );
+
+		rules.resize( 5 );
+		rules[0].result_exp = EX_E;
+		rules[0].num_to_pop = 3;
+
+		rules[1].result_exp = EX_E;
+		rules[1].num_to_pop = 1;
+
+		rules[2].result_exp = EX_T;
+		rules[2].num_to_pop = 3;
+
+		rules[3].result_exp = EX_T;
+		rules[3].num_to_pop = 1;
+
+		rules[4].result_exp = EX_T;
+		rules[4].num_to_pop = 3;
+		
+		LR_stack_item initial;
+		initial.insert_exp( EX_EMPTY );
+		initial.state = 0;
+		shift( initial );
 	}
 
-	void shift( token in)
+	void shift( LR_stack_item to_insert )
 	{
-		LR_stack_item to_insert;
-		to_insert.expr_or_tok = 1;
-		to_insert.tk = in.name;
-		to_insert.current_value = in.data_b;
-
 		item_stack.push_back( to_insert );
-
 		debug_print_arr();
 	}
 
-	//see if any of the items match the rules
-	//current implementation is not fancy, just an O(n+m) matching
-	//there are many various faster ways of matching, see string matching algorithms
-	//the reducing could be much fancier, but it's not necessary
-	bool reduce()
+	void reduce( int rule )
 	{
-		bool substitution_made = false;
-
-		//depending on how nice to be when detecting errors,
-		//the printfs can be substituded for dumping the stack and continuing
-		LR_stack_item tmp = item_stack.back();
-		if( tmp.expr_or_tok )
-			switch( tmp.tk )
-			{
-			case TK_BOOL:
-				{
-					LR_stack_item val;
-					val.expr_or_tok = 0;
-					val.expr = EX_VALUE;
-					val.current_value = tmp.current_value;
-					item_stack.pop_back();
-					item_stack.push_back( val );
-					substitution_made = true;
-					break;
-				}
-			case TK_BRCL: //bracket close
-				{
-					if( item_stack.size() < 3 )
-					{
-						printf( "Invalid syntax" );
-					}
-					item_stack.pop_back(); //remove closing bracket
-
-					LR_stack_item value = item_stack.back();
-					if( value.expr_or_tok || value.expr != EX_ADD )
-					{
-						printf( "Invalid syntax" );
-					}
-					item_stack.pop_back(); //temporarily remove the value
-
-					if( ! item_stack.back().expr_or_tok || item_stack.back().tk != TK_BROP )
-					{
-						//no open bracket
-						printf( "Invalid syntax" );
-					}
-					item_stack.pop_back();
-
-					value.expr = EX_VALUE;
-					item_stack.push_back( value );
-					substitution_made = true;
-					break;
-				}
-			default:
-				{
-					break;
-				}
-			}
-		else
-		{
-			switch( tmp.expr )
-			{
-			case EX_VALUE:
-				{
-					//we can match this into MULT
-					//If there is a MULT mult_op, then update the bool and remove those values
-					LR_stack_item value = item_stack.back();
-					item_stack.pop_back();
-					if( item_stack.size() > 2 )
-					{
-						//so much boilerplate... I can't seem to get rbegin()-1 compiling inline
-						LR_stack_item tk_m = item_stack.back();
-						list< LR_stack_item>::reverse_iterator it = item_stack.rbegin();
-						it++;
-						LR_stack_item tk_mv = *it;
-						if( tk_m.expr_or_tok
-							&& tk_m.tk == TK_MULT
-							&& tk_mv.expr_or_tok == false
-							&& tk_mv.expr == EX_MULT )
-						{
-							value.current_value &= tk_mv.current_value;
-							item_stack.pop_back();
-							item_stack.pop_back();
-						}
-					}
-					value.expr = EX_MULT;
-					item_stack.push_back( value );
-
-					substitution_made = true;
-					break;
-				}
-
-			case EX_MULT:
-				{
-					//exchange it for an ADD
-					//if there are other ADDs, update the value and remove them
-					LR_stack_item mult = *( item_stack.rbegin() );
-					item_stack.pop_back();
-					if( item_stack.size() > 2 )
-					{
-						//TODO
-						//possibly do stuff
-					}
-					mult.expr = EX_ADD;
-					item_stack.push_back( mult );
-
-					substitution_made = true;
-					break;
-				}
-			default:
-				break;
-			}
-		}
-
+		//note: we're not building an AST tree, so
+		//we have to hack in the operations into here
 		debug_print_arr();
-		return substitution_made;
 	}
 
 public:
 	//for every new input token, run parser()
-	void parser( token in )
+
+	bool parser( symbol in, bool data )
 	{
-		shift( in );
-		while( reduce() ){} //reduce as many times as needed
+		LR_stack_item top = item_stack.back();
+		map< symbol, parse_table_item >::iterator it = parse_table[top.state].find( in );
+		if( it == parse_table[top.state].end() )
+		{
+			printf( "bad syntax\n" );
+			throw "Incorrect syntax";
+		}
+
+		parse_table_item itm = it->second;
+		if( itm.reduce_rule == -1 ) //flag for accepting
+		{
+			final_value = item_stack.back().current_value;
+			return false;
+		}
+
+		bool reduced = false;
+		if( itm.shift_or_reduce == false ) //shift
+		{
+			LR_stack_item new_s;
+			new_s.smb = in;
+			new_s.current_value = data;
+			new_s.state = itm.new_state;
+			shift( new_s );
+		}
+		else //reduce
+		{
+			reduced = true;
+			parser_rule rule = rules[itm.reduce_rule];
+			//since we're not building an AST tree, the below is somewhat of a hack to compute the value
+			bool new_value = false;
+			switch( itm.reduce_rule )
+			{
+			case 0:
+				{
+					bool val1 = item_stack.back().current_value;
+					list< LR_stack_item>::reverse_iterator prev_it = item_stack.rbegin();
+					prev_it++;//can't increment by more than 1 with lists
+					prev_it++;
+					bool val2 = prev_it->current_value;
+					new_value = val1 | val2;
+					break;
+				}
+				case 1:
+					new_value = item_stack.back().current_value;
+					break;
+				case 2:
+					{
+						bool val1 = item_stack.back().current_value;
+						list< LR_stack_item>::reverse_iterator prev_it = item_stack.rbegin();
+						prev_it++;//can't increment by more than 1 with lists
+						prev_it++;
+						bool val2 = prev_it->current_value;
+						new_value = val1 & val2;
+						break;
+					}
+				case 3:
+					new_value = item_stack.back().current_value;
+					break;
+				case 4:
+					{
+						list< LR_stack_item>::reverse_iterator prev_it = item_stack.rbegin();
+						prev_it++;
+						new_value = prev_it->current_value;
+						break;
+					}
+				default:
+					printf( "Rule error\n" );
+					break;
+			}
+
+			for( int i = 0; i < rule.num_to_pop; i++ )
+			{
+				item_stack.pop_back();
+			}
+
+			LR_stack_item old_state = item_stack.back();
+			LR_stack_item new_state;
+
+			new_state.insert_exp( rule.result_exp );
+			new_state.state = parse_table[ old_state.state][ rule.result_exp ].new_state;
+			new_state.current_value = new_value;
+
+			item_stack.push_back( new_state );
+
+			debug_print_arr();
+		}
+		return reduced;
+	}
+
+	void parser_t( token in )
+	{
+		symbol s( in.name );
+		while( parser( s, in.data_b ) );
 	}
 };
 
@@ -332,13 +441,19 @@ int _tmain(int argc, _TCHAR* argv[])
 	incremental_lexer lex;
 	incremental_parser parser;
 
-	for( char c = getchar(); c != '\n'; c = getchar() )
+	for( char c = getchar();; c = getchar() )
 	{
 		possible_token t = lex.lexer( c );
 		if( !t.has_token )
 			continue;
 
-		parser.parser( t.tk );
+		parser.parser_t( t.tk );
+
+		if( c == '\n' )
+		{
+			printf( "Result is %d\n", parser.final_value );
+			break;
+		}
 	}
 	return 0;
 }
