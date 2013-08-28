@@ -4,10 +4,10 @@
 #include <iostream>
 #include <list>
 
-//Boolean math expression evaluator
+//Boolean math expression evaluator, implemented as an SLR(1) parser
 //Goals: easy to switch reading from cin to files
 //It lexes, parses and evaluates input on the fly (streaming).
-//It should handle very large, but relatively "flat" input
+//It should handle very large (larger than memory space), but relatively "flat" input
 //For lowering stack memory consumption in large, heavily-bracketed files, 
 //the design can be updated to first find the AST children (deepest brackets) and evaluate them first
 //If more performance is needed, look into using a parser library instead
@@ -21,9 +21,10 @@ enum tokens
 	TK_BOOL,
 	TK_BROP,
 	TK_BRCL,
-	TK_END
+	TK_END //no-more-characters signal
 };
 
+//Helper struct for containing data for tokens such as booleans
 struct token
 {
 	tokens name;
@@ -36,21 +37,84 @@ struct token
 	token( tokens t, bool data ) : name( t ), data_b( data ) {}
 };
 
+//Helper struct. If has_token is false, this is just a dummy struct
+struct possible_token
+{
+	bool has_token;
+	token tk;
+
+	possible_token() : has_token( false ) {}
+
+	void set_token( token t )
+	{
+		has_token = true;
+		tk = t;
+	}
+};
+
+class incremental_lexer
+{
+	unordered_map< char, tokens > token_map;
+
+public:
+	incremental_lexer()
+	{
+		token_map.insert( make_pair( '+', TK_PLUS ) );
+		token_map.insert( make_pair( '*', TK_MULT ) );
+		token_map.insert( make_pair( '0', TK_BOOL ) );
+		token_map.insert( make_pair( '1', TK_BOOL ) );
+		token_map.insert( make_pair( '(', TK_BROP ) );
+		token_map.insert( make_pair( ')', TK_BRCL ) );
+		token_map.insert( make_pair( '\n', TK_END ) );
+	}
+
+	void clear()
+	{}
+
+	//for every new input character, the lexer outputs zero or one token
+	//For our language, there is no need for state in the lexer, since all tokens are 1 char wide
+	possible_token lexer( char in )
+	{
+		possible_token out;
+		unordered_map< char, tokens >::iterator it_finder = token_map.find( in );
+		if( it_finder != token_map.end() )
+		{
+			out.set_token( token( it_finder->second, in ) );
+			if( it_finder->second == TK_BOOL )
+			{
+				if( in == '0' )
+				{
+					out.tk.data_b = false;
+				}
+				else
+				{
+					out.tk.data_b = true;
+				}
+			}
+		}
+		else
+		{
+			//Optional: assert( false ) or throw "Unrecognized token"
+			//Also optional: check for spaces
+			printf( "Unrecognized token '%c', ignoring.\n", in );
+		}
+
+		return out;
+	}
+};
+
 enum expressions
 {
 	EX_VALUE,
 	EX_MULT,
 	EX_ADD,
-	EX_EMPTY,
-	EX_E,
-	EX_T,
-	EX_ACCEPT
+	EX_EMPTY
 };
 
 struct symbol
 {
-	bool expr_or_tok; //token is true, expression is false
-	union //depending on bool expr_or_tok
+	bool expr_or_tok; //if token then true, if expression then false
+	union //depending on expr_or_tok
 	{
 		tokens tk;
 		expressions expr;
@@ -85,94 +149,14 @@ struct symbol
 	}
 };
 
-struct LR_stack_item
-{
-	symbol smb;
-
-	//since this parser doesn't need to keep a real AST,
-	//this serves as an "accumulator"
-	bool current_value; 
-
-	int state;
-
-	void insert_tok( tokens tki )
-	{
-		smb.insert_tok( tki );
-	}
-	void insert_exp( expressions ex )
-	{
-		smb.insert_exp( ex );
-	}
-};
-
-struct possible_token
-{
-	bool has_token;
-	token tk;
-
-	possible_token() : has_token( false ) {}
-
-	void set_token( token t )
-	{
-		has_token = true;
-		tk = t;
-	}
-};
-
+//stores a single grammar rule for the language
 struct parser_rule
 {
-	expressions result_exp;
-	int num_to_pop;
+	expressions result_exp; //left side of the equation
+	int num_to_pop; //number of items on the right sign of the equation
 };
 
-class incremental_lexer
-{
-	unordered_map< char, tokens > token_map;
-
-public:
-	incremental_lexer()
-	{
-		token_map.insert( make_pair( '+', TK_PLUS ) );
-		token_map.insert( make_pair( '*', TK_MULT ) );
-		token_map.insert( make_pair( '0', TK_BOOL ) );
-		token_map.insert( make_pair( '1', TK_BOOL ) );
-		token_map.insert( make_pair( '(', TK_BROP ) );
-		token_map.insert( make_pair( ')', TK_BRCL ) );
-		token_map.insert( make_pair( '\n', TK_END ) );
-	}
-
-	//for every new input character, the lexer outputs zero or one token
-	//For our language, there is no need for state in the lexer, since all tokens are 1 char wide
-	possible_token lexer( char in )
-	{
-		possible_token out;
-		unordered_map< char, tokens >::iterator it_finder = token_map.find( in );
-		if( it_finder != token_map.end() )
-		{
-			out.set_token( token( it_finder->second, in ) );
-			if( it_finder->second == TK_BOOL )
-			{
-				if( in == '0' )
-				{
-					out.tk.data_b = false;
-				}
-				else
-				{
-					out.tk.data_b = true;
-				}
-			}
-		}
-		else
-		{
-			//Optional: assert( false ) or throw "Unrecognized token"
-			//Also optional: check for spaces
-			printf( "Unrecognized token, ignoring.\n" );
-		}
-
-		return out;
-	}
-};
-
+//state machine helper
 struct parse_table_item
 {
 	bool shift_or_reduce; //false=shift, true=reduce
@@ -184,6 +168,27 @@ struct parse_table_item
 
 	parse_table_item() {}
 	parse_table_item( bool sr, int st ) : shift_or_reduce( sr ), new_state( st ) {}
+};
+
+//parser stack item. In this parser design, token and state stacks are merged
+struct LR_stack_item
+{
+	symbol smb;
+
+	//since this parser doesn't need to keep a real AST,
+	//this serves as an "accumulator"
+	bool current_value;
+
+	int state;
+
+	void insert_tok( tokens tki )
+	{
+		smb.insert_tok( tki );
+	}
+	void insert_exp( expressions ex )
+	{
+		smb.insert_exp( ex );
+	}
 };
 
 class incremental_parser
@@ -199,8 +204,10 @@ private:
 	vector< parser_rule > rules;
 	list< LR_stack_item> item_stack; //using a list because we need access to all elements
 
+#ifdef DEBUG_PARSER
 	unordered_map< tokens, char > debug_map;
 	unordered_map< expressions, char > debug_map2;
+#endif
 
 	//map and not an unordred_map because I'm too lazy to write a hasher helper
 	//C++ can't figure out a default hash function for non-primitive types
@@ -210,6 +217,7 @@ private:
 
 	void debug_print_arr()
 	{
+#ifdef DEBUG_PARSER
 		for( list<LR_stack_item>::iterator it = item_stack.begin(); it != item_stack.end(); ++it )
 		{
 			if( it->smb.expr_or_tok )
@@ -227,6 +235,7 @@ private:
 			printf( " " );
 		}
 		printf( "\n" );
+#endif
 	}
 
 public:
@@ -238,10 +247,18 @@ public:
 		//I'm assuming the typical algebraic operator precedence:
 		//brackets take precedence over multiplication, which in turn takes precedence over addition
 
-		//MULT -> VALUE | MULT mult_op VALUE
-		//ADD -> ADD plus_op MULT | MULT
-		//VALUE -> ( ADD )
+		//S' -> ADD
+		//ADD -> MULT | MULT + ADD
+		//MULT -> VALUE | VALUE * MULT
+		//VALUE -> ( ADD ) | bool
 
+		//This expands to 15 states. 
+		//The states and the transitions are stored in parse_table
+		//For deriving state transitions, see SLR parse table derivation
+
+		//The rules are stored in "rules"
+
+#ifdef DEBUG_PARSER
 		debug_map.insert( make_pair( TK_PLUS, '+' ) );
 		debug_map.insert( make_pair( TK_MULT, '*' ) );
 		debug_map.insert( make_pair( TK_BOOL, 'B' ) );
@@ -253,10 +270,10 @@ public:
 		debug_map2.insert( make_pair( EX_MULT, 'M' ) );
 		debug_map2.insert( make_pair( EX_ADD, 'A' ) );
 		debug_map2.insert( make_pair( EX_EMPTY, '\\' ) );
-		debug_map2.insert( make_pair( EX_E, 'E' ) );
-		debug_map2.insert( make_pair( EX_T, 'T' ) );
+#endif
 		
 		parse_table.resize( NUM_STATES );
+		parse_table[0].insert( make_pair( symbol( TK_END ), parse_table_item( true, -1 ) ) );
 		parse_table[0].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 4 ) ) );
 		parse_table[0].insert( make_pair( symbol( TK_BOOL), parse_table_item( false, 5 ) ) );
 		parse_table[0].insert( make_pair( symbol( EX_ADD ), parse_table_item( false, 1 ) ) );
@@ -344,6 +361,13 @@ public:
 		rules[5].result_exp = EX_VALUE;
 		rules[5].num_to_pop = 1;
 		
+		init_stack();
+	}
+
+private:
+
+	void init_stack()
+	{
 		LR_stack_item initial;
 		initial.insert_exp( EX_EMPTY );
 		initial.state = 0;
@@ -356,24 +380,24 @@ public:
 		debug_print_arr();
 	}
 
-	void reduce( int rule )
+public:
+
+	void clear()
 	{
-		//note: we're not building an AST tree, so
-		//we have to hack in the operations into here
-		debug_print_arr();
+		item_stack.clear();
+		init_stack();
 	}
 
-public:
-	//for every new input token, run parser()
-
-	bool parser( symbol in, bool data )
+	//for every new input token, run parser() or parser_t()
+	bool parser_t( symbol in, bool data )
 	{
 		LR_stack_item top = item_stack.back();
 		map< symbol, parse_table_item >::iterator it = parse_table[top.state].find( in );
 		if( it == parse_table[top.state].end() )
 		{
-			printf( "bad syntax\n" );
-			throw "Incorrect syntax";
+			printf( "bad syntax, starting anew\n" );
+			clear();
+			return false;
 		}
 
 		parse_table_item itm = it->second;
@@ -396,7 +420,9 @@ public:
 		{
 			reduced = true;
 			parser_rule rule = rules[itm.reduce_rule];
+
 			//since we're not building an AST tree, the below is somewhat of a hack to compute the value
+			//alternatively, we could add an AST calculation stage
 			bool new_value = false;
 			switch( itm.reduce_rule )
 			{
@@ -467,31 +493,72 @@ public:
 		return reduced;
 	}
 
-	void parser_t( token in )
+	//token input from lexer
+	void parser( token in )
 	{
 		symbol s( in.name );
-		while( parser( s, in.data_b ) );
+		while( parser_t( s, in.data_b ) );
 	}
 };
+
+//on non-well-formed input, this function will return an arbitrary value
+//(garbage-in, garbage-out). It's relatively simple to add cathes and throw()s to 
+//the relevant secitons of the code if different behavior is desired
+bool calculator_function( string in )
+{
+	incremental_lexer lex;
+	incremental_parser parser;
+
+	for( int i = 0; i < in.length(); i++ )
+	{
+		possible_token t = lex.lexer( in[i] );
+		if( !t.has_token )
+		{
+			continue;
+		}
+		parser.parser( t.tk );
+	}
+	return parser.final_value;
+}
 
 int _tmain(int argc, _TCHAR* argv[])
 {
 	incremental_lexer lex;
 	incremental_parser parser;
 
-	for( char c = getchar();; c = getchar() )
+	//testing the calculator function:
+	string input = "(0*(0+1)+(1))"; //should evaluate to true
+	bool output = calculator_function( input );
+	if( !output )
 	{
+		printf( "Failed test\n" );
+		return;
+	}
+
+	printf( "Enter X to exit\n" );
+
+	for( char c = getchar(); ; c = getchar() )
+	{
+		if( c == 'X' )
+		{
+			break;
+		}
+
 		possible_token t = lex.lexer( c );
 		if( !t.has_token )
+		{
 			continue;
+		}
 
-		parser.parser_t( t.tk );
+		parser.parser( t.tk );
 
 		if( c == '\n' )
 		{
 			printf( "Result is %d\n", parser.final_value );
-			break;
+			lex.clear();
+			parser.clear();
 		}
+
 	}
 	return 0;
 }
