@@ -10,7 +10,7 @@
 //It should handle very large (larger than memory space), but relatively "flat" input
 //For lowering stack memory consumption in large, heavily-bracketed files, 
 //the design can be updated to first find the AST children (deepest brackets) and evaluate them first
-//If more performance is needed, look into using a parser library instead
+//If more performance or flexibility is needed, a parser library may be beneficial
 
 using namespace std;
 
@@ -95,7 +95,6 @@ public:
 		else
 		{
 			//Optional: assert( false ) or throw "Unrecognized token"
-			//Also optional: check for spaces
 			printf( "Unrecognized token '%c', ignoring.\n", in );
 		}
 
@@ -195,6 +194,7 @@ class incremental_parser
 {
 public:
 	bool final_value;
+	bool errors;
 
 private:
 	static const int NUM_STATES = 15;
@@ -209,8 +209,7 @@ private:
 	unordered_map< expressions, char > debug_map2;
 #endif
 
-	//map and not an unordred_map because I'm too lazy to write a hasher helper
-	//C++ can't figure out a default hash function for non-primitive types
+	//unordered_map could be substituted to improve performance
 	vector< map< symbol, parse_table_item > > parse_table;
 
 	int offset_state;
@@ -243,7 +242,7 @@ public:
 	{
 		offset_state = 0;
 
-		//EBNF-ish notation.
+		//EBNF right-recursive notation.
 		//I'm assuming the typical algebraic operator precedence:
 		//brackets take precedence over multiplication, which in turn takes precedence over addition
 
@@ -252,7 +251,7 @@ public:
 		//MULT -> VALUE | VALUE * MULT
 		//VALUE -> ( ADD ) | bool
 
-		//This expands to 15 states. 
+		//This expands to 15 SLR states. 
 		//The states and the transitions are stored in parse_table
 		//For deriving state transitions, see SLR parse table derivation
 
@@ -342,6 +341,7 @@ public:
 		parse_table[14].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 4 ) ) );
 		parse_table[14].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 4 ) ) );
 
+		//the EBNF substitutions
 		rules.resize( 6 );
 		rules[0].result_exp = EX_ADD;
 		rules[0].num_to_pop = 1;
@@ -361,7 +361,7 @@ public:
 		rules[5].result_exp = EX_VALUE;
 		rules[5].num_to_pop = 1;
 		
-		init_stack();
+		clear();
 	}
 
 private:
@@ -372,6 +372,7 @@ private:
 		initial.insert_exp( EX_EMPTY );
 		initial.state = 0;
 		shift( initial );
+
 	}
 
 	void shift( LR_stack_item to_insert )
@@ -386,17 +387,24 @@ public:
 	{
 		item_stack.clear();
 		init_stack();
+		final_value = false;
+		errors = false;
 	}
 
-	//for every new input token, run parser() or parser_t()
+	//for every new input token, run parser(). This is a helper function
 	bool parser_t( symbol in, bool data )
 	{
+		if( errors )
+			return false;
+
 		LR_stack_item top = item_stack.back();
 		map< symbol, parse_table_item >::iterator it = parse_table[top.state].find( in );
 		if( it == parse_table[top.state].end() )
 		{
-			printf( "bad syntax, starting anew\n" );
-			clear();
+			//optional:
+			//printf( "bad syntax, starting anew\n" );
+			//clear();
+			errors = true;
 			return false;
 		}
 
@@ -493,7 +501,7 @@ public:
 		return reduced;
 	}
 
-	//token input from lexer
+	//run for every token from the lexer
 	void parser( token in )
 	{
 		symbol s( in.name );
@@ -501,13 +509,14 @@ public:
 	}
 };
 
-//on non-well-formed input, this function will return an arbitrary value
-//(garbage-in, garbage-out). It's relatively simple to add cathes and throw()s to 
-//the relevant secitons of the code if different behavior is desired
+//on "bad" input, this function will return false.
+//one can check for parser.errors to see if input was parsed correctly
 bool calculator_function( string in )
 {
 	incremental_lexer lex;
 	incremental_parser parser;
+
+	in.push_back( '\n' );
 
 	for( int i = 0; i < in.length(); i++ )
 	{
@@ -532,7 +541,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if( !output )
 	{
 		printf( "Failed test\n" );
-		return;
+		//return 0;
 	}
 
 	printf( "Enter X to exit\n" );
@@ -554,7 +563,14 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		if( c == '\n' )
 		{
-			printf( "Result is %d\n", parser.final_value );
+			if( !parser.errors )
+			{
+				printf( "Result is %d\n", parser.final_value );
+			}
+			else
+			{
+				printf( "Invalid input\n" );
+			}
 			lex.clear();
 			parser.clear();
 		}
