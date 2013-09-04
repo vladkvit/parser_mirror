@@ -505,7 +505,8 @@ public:
 	void parser( token in )
 	{
 		symbol s( in.name );
-		while( parser_t( s, in.data_b ) );
+		while( parser_t( s, in.data_b ) )
+			;
 	}
 };
 
