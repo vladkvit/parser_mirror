@@ -24,6 +24,41 @@ enum tokens
 	TK_END //no-more-characters signal
 };
 
+enum data_type
+{
+	DT_BOOL,
+	DT_INT,
+	DT_FLOAT
+};
+
+struct data_t
+{
+	data_type type;
+
+	union
+	{
+		bool d_bool;
+		int d_int;
+		double d_float;
+	};
+
+	void set( bool b )
+	{
+		type = DT_BOOL;
+		d_bool = b;
+	}
+	void set( int i )
+	{
+		type = DT_INT;
+		d_int = i;
+	}
+	void set( double d )
+	{
+		type = DT_FLOAT;
+		d_float = d;
+	}
+};
+
 //Helper struct for containing data for tokens such as booleans
 struct token
 {
