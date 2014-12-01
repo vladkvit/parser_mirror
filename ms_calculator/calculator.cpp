@@ -21,7 +21,8 @@ enum data_type
 {
 	DT_BOOL,
 	DT_INT,
-	DT_FLOAT
+	DT_FLOAT,
+	DT_NONE
 };
 
 struct data_t
@@ -50,6 +51,21 @@ struct data_t
 		type = DT_FLOAT;
 		d_float = d;
 	}
+
+	data_t() : type(DT_NONE) {}
+	data_t(bool b)
+	{
+		set(b);
+	}
+
+	data_t(int i)
+	{
+		set(i);
+	}
+	data_t(float f)
+	{
+		set(f);
+	}
 };
 
 //Helper struct for containing data for tokens such as booleans
@@ -58,11 +74,17 @@ struct token
 	tokens name;
 
 	//for passing the value of boolean. 
-	//If extending this parser, it may need to be switched to a union of different types
-	bool data_b;
+	data_t data_b;
 
-	token(){};
-	token( tokens t, bool data ) : name( t ), data_b( data ) {}
+	token()
+	{
+		data_b.type = DT_NONE;
+	};
+
+	token( tokens t, bool b ) : name( t )
+	{
+		data_b.set(b);
+	}
 };
 
 //Helper struct. If has_token is false, this is just a dummy struct
@@ -198,7 +220,7 @@ struct LR_stack_item
 
 	//since this parser doesn't need to keep a real AST,
 	//this serves as an "accumulator"
-	bool current_value;
+	data_t current_value;
 
 	int state;
 
@@ -431,7 +453,7 @@ public:
 	}
 
 	//for every new input token, run parser(). This is a helper function
-	bool parser_t( symbol in, bool data )
+	bool parser_t( symbol in, data_t data )
 	{
 		if( errors )
 			return false;
@@ -450,7 +472,16 @@ public:
 		parse_table_item itm = it->second;
 		if( itm.reduce_rule == -1 ) //flag for accepting
 		{
-			final_value = item_stack.back().current_value;
+			data_t cur_val = item_stack.back().current_value;
+			if (cur_val.type == DT_NONE)
+				final_value = false;
+			else if (cur_val.type == DT_BOOL)
+				final_value = cur_val.d_bool;
+			else
+			{
+				printf("Logic error, incorrect data type returned");
+				final_value = false;
+			}
 			return false;
 		}
 
@@ -470,36 +501,37 @@ public:
 
 			//since we're not building an AST tree, the below is somewhat of a hack to compute the value
 			//alternatively, we could add an AST calculation stage
+			//TODO - implement operations other than bool-bool interactions.
 			bool new_value = false;
 			switch( itm.reduce_rule )
 			{
 				case 0:
 				{
-					new_value = item_stack.back().current_value;
+					new_value = item_stack.back().current_value.d_bool;
 					break;
 				}
 				case 1:
 				{
-					bool val1 = item_stack.back().current_value;
+					bool val1 = item_stack.back().current_value.d_bool;
 					list< LR_stack_item>::reverse_iterator prev_it = item_stack.rbegin();
 					prev_it++;//can't increment by more than 1 with lists
 					prev_it++;
-					bool val2 = prev_it->current_value;
+					bool val2 = prev_it->current_value.d_bool;
 					new_value = val1 | val2;
 					break;
 				}
 				case 2:
 				{
-					new_value = item_stack.back().current_value;
+					new_value = item_stack.back().current_value.d_bool;
 					break;
 				}
 				case 3:
 				{
-					bool val1 = item_stack.back().current_value;
+					bool val1 = item_stack.back().current_value.d_bool;
 					list< LR_stack_item>::reverse_iterator prev_it = item_stack.rbegin();
 					prev_it++;//can't increment by more than 1 with lists
 					prev_it++;
-					bool val2 = prev_it->current_value;
+					bool val2 = prev_it->current_value.d_bool;
 					new_value = val1 & val2;
 					break;
 				}
@@ -507,12 +539,12 @@ public:
 				{
 					list< LR_stack_item>::reverse_iterator prev_it = item_stack.rbegin();
 					prev_it++;
-					new_value = prev_it->current_value;
+					new_value = prev_it->current_value.d_bool;
 					break;
 				}
 				case 5:
 				{
-					new_value = item_stack.back().current_value;
+					new_value = item_stack.back().current_value.d_bool;
 					break;
 				}
 
@@ -575,6 +607,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	incremental_lexer lex;
 	incremental_parser parser;
 
+#ifdef TEST_PARSER
 	//testing the calculator function:
 	string input = "(0*(0+1)+(1))"; //should evaluate to true
 	bool output = calculator_function( input );
@@ -583,6 +616,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf( "Failed test\n" );
 		//return 0;
 	}
+#endif
 
 	printf( "Enter X to exit\n" );
 
