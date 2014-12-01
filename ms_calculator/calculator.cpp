@@ -4,6 +4,9 @@
 #include <iostream>
 #include <list>
 
+//should have enum tokens, enum expressions
+#include "tokens_states_rules.h"
+
 //Boolean math expression evaluator, implemented as an SLR(1) parser
 //Goals: easy to switch reading from cin to files
 //It lexes, parses and evaluates input on the fly (streaming).
@@ -13,16 +16,6 @@
 //If more performance or flexibility is needed, a parser library may be beneficial
 
 using namespace std;
-
-enum tokens
-{
-	TK_PLUS,
-	TK_MULT,
-	TK_BOOL,
-	TK_BROP,
-	TK_BRCL,
-	TK_END //no-more-characters signal
-};
 
 enum data_type
 {
@@ -137,13 +130,7 @@ public:
 	}
 };
 
-enum expressions
-{
-	EX_VALUE,
-	EX_MULT,
-	EX_ADD,
-	EX_EMPTY
-};
+
 
 struct symbol
 {
