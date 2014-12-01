@@ -365,27 +365,33 @@ private:
 		rules.resize(6);
 		rules[0].result_exp = EX_ADD;
 		rules[0].rhs.push_back( EX_MULT );
+		rules[0].callback = rule0_cbk;
 
 		rules[1].result_exp = EX_ADD;
 		rules[1].rhs.push_back(EX_MULT);
 		rules[1].rhs.push_back(TK_PLUS);
 		rules[1].rhs.push_back(EX_ADD);
+		rules[1].callback = rule1_cbk;
 
 		rules[2].result_exp = EX_MULT;
 		rules[2].rhs.push_back(EX_VALUE);
+		rules[2].callback = rule2_cbk;
 
 		rules[3].result_exp = EX_MULT;
 		rules[3].rhs.push_back(EX_VALUE);
 		rules[3].rhs.push_back(TK_MULT);
 		rules[3].rhs.push_back(EX_MULT);
+		rules[3].callback = rule3_cbk;
 
 		rules[4].result_exp = EX_VALUE;
 		rules[4].rhs.push_back(TK_BROP);
 		rules[4].rhs.push_back(EX_ADD);
 		rules[4].rhs.push_back(TK_BRCL);
+		rules[4].callback = rule4_cbk;
 
 		rules[5].result_exp = EX_VALUE;
 		rules[5].rhs.push_back( TK_BOOL );
+		rules[5].callback = rule5_cbk;
 	}
 
 	void init_parse_table_precalculated()
@@ -522,43 +528,7 @@ public:
 			//alternatively, we could add an AST calculation stage
 			//TODO - implement operations other than bool-bool interactions.
 			bool new_value = false;
-			switch( itm.reduce_rule )
-			{
-				case 0:
-				{
-					new_value = rule0_cbk( item_stack );
-					break;
-				}
-				case 1:
-				{
-					new_value = rule1_cbk(item_stack);
-					break;
-				}
-				case 2:
-				{
-					new_value = rule2_cbk(item_stack);
-					break;
-				}
-				case 3:
-				{
-					new_value = rule3_cbk(item_stack);
-					break;
-				}
-				case 4:
-				{
-					new_value = rule4_cbk(item_stack);
-					break;
-				}
-				case 5:
-				{
-					new_value = rule5_cbk(item_stack);
-					break;
-				}
-
-				default:
-					printf( "Rule error\n" );
-					break;
-			}
+			new_value = (*rule.callback)(item_stack);
 
 			for( int i = 0; i < rule.rhs.size(); i++ )
 			{
