@@ -234,6 +234,8 @@ private:
 	//unordered_map could be substituted to improve performance
 	vector< map< symbol, parse_table_item > > parse_table;
 
+	map< symbol, tokens > follow_table;
+
 	int offset_state;
 
 	void debug_print_arr()
@@ -279,109 +281,11 @@ public:
 
 		//The rules are stored in "rules"
 
-#ifdef DEBUG_PARSER
-		debug_map.insert( make_pair( TK_PLUS, '+' ) );
-		debug_map.insert( make_pair( TK_MULT, '*' ) );
-		debug_map.insert( make_pair( TK_BOOL, 'B' ) );
-		debug_map.insert( make_pair( TK_BROP, '(' ) );
-		debug_map.insert( make_pair( TK_BRCL, ')' ) );
-		debug_map.insert( make_pair( TK_END, '/' ) );
+		init_debug_map();
 
-		debug_map2.insert( make_pair( EX_VALUE, 'V' ) );
-		debug_map2.insert( make_pair( EX_MULT, 'M' ) );
-		debug_map2.insert( make_pair( EX_ADD, 'A' ) );
-		debug_map2.insert( make_pair( EX_EMPTY, '\\' ) );
-#endif
-		
-		parse_table.resize( NUM_STATES );
-		parse_table[0].insert( make_pair( symbol( TK_END ), parse_table_item( true, -1 ) ) );
-		parse_table[0].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 4 ) ) );
-		parse_table[0].insert( make_pair( symbol( TK_BOOL), parse_table_item( false, 5 ) ) );
-		parse_table[0].insert( make_pair( symbol( EX_ADD ), parse_table_item( false, 1 ) ) );
-		parse_table[0].insert( make_pair( symbol( EX_MULT ), parse_table_item( false, 2 ) ) );
-		parse_table[0].insert( make_pair( symbol( EX_VALUE ), parse_table_item( false, 3 ) ) );
+		init_parse_table_precalculated();
 
-		parse_table[1].insert( make_pair( symbol( TK_END ), parse_table_item( true, -1 ) ) );
-		
-		parse_table[2].insert( make_pair( symbol( TK_END ), parse_table_item( true, 0 ) ) );
-		parse_table[2].insert( make_pair( symbol( TK_PLUS ), parse_table_item( false, 6 ) ) );
-		parse_table[2].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 0 ) ) );
-
-		parse_table[3].insert( make_pair( symbol( TK_END ), parse_table_item( true, 2 ) ) );
-		parse_table[3].insert( make_pair( symbol( TK_MULT ), parse_table_item( false, 7 ) ) );
-		parse_table[3].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 2 ) ) );
-		parse_table[3].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 2 ) ) );
-
-		parse_table[4].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 4 ) ) );
-		parse_table[4].insert( make_pair( symbol( TK_BOOL ), parse_table_item( false, 12 ) ) );
-		parse_table[4].insert( make_pair( symbol( EX_ADD ), parse_table_item( false, 8 ) ) );
-		parse_table[4].insert( make_pair( symbol( EX_MULT ), parse_table_item( false, 10 ) ) );
-		parse_table[4].insert( make_pair( symbol( EX_VALUE ), parse_table_item( false, 11 ) ) );
-
-		parse_table[5].insert( make_pair( symbol( TK_END ), parse_table_item( true, 5 ) ) );
-		parse_table[5].insert( make_pair( symbol( TK_MULT ), parse_table_item( true, 5 ) ) );
-		parse_table[5].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 5 ) ) );
-		parse_table[5].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 5 ) ) );
-
-		parse_table[6].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 4 ) ) );
-		parse_table[6].insert( make_pair( symbol( TK_BOOL ), parse_table_item( false, 12 ) ) );
-		parse_table[6].insert( make_pair( symbol( EX_ADD ), parse_table_item( false, 9 ) ) );
-		parse_table[6].insert( make_pair( symbol( EX_MULT ), parse_table_item( false, 10 ) ) );
-		parse_table[6].insert( make_pair( symbol( EX_VALUE ), parse_table_item( false, 11 ) ) );
-
-		parse_table[7].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 4 ) ) );
-		parse_table[7].insert( make_pair( symbol( TK_BOOL ), parse_table_item( false, 12 ) ) );
-		parse_table[7].insert( make_pair( symbol( EX_MULT ), parse_table_item( false, 13 ) ) );
-		parse_table[7].insert( make_pair( symbol( EX_VALUE ), parse_table_item( false, 11 ) ) );
-
-		parse_table[8].insert( make_pair( symbol( TK_BRCL ), parse_table_item( false, 14 ) ) );
-
-		parse_table[9].insert( make_pair( symbol( TK_END ), parse_table_item( true, 1 ) ) );
-		parse_table[9].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 1 ) ) );
-
-		parse_table[10].insert( make_pair( symbol( TK_END ), parse_table_item( true, 0 ) ) );
-		parse_table[10].insert( make_pair( symbol( TK_PLUS ), parse_table_item( false, 6 ) ) );
-		parse_table[10].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 0 ) ) );
-
-		parse_table[11].insert( make_pair( symbol( TK_END ), parse_table_item( true, 2 ) ) );
-		parse_table[11].insert( make_pair( symbol( TK_MULT ), parse_table_item( false, 7 ) ) );
-		parse_table[11].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 2 ) ) );
-		parse_table[11].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 2 ) ) );
-
-		parse_table[12].insert( make_pair( symbol( TK_END ), parse_table_item( true, 5 ) ) );
-		parse_table[12].insert( make_pair( symbol( TK_MULT ), parse_table_item( true, 5 ) ) );
-		parse_table[12].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 5 ) ) );
-		parse_table[12].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 5 ) ) );
-
-		parse_table[13].insert( make_pair( symbol( TK_END ), parse_table_item( true, 3 ) ) );
-		parse_table[13].insert( make_pair( symbol( TK_MULT ), parse_table_item( true, 3 ) ) );
-		parse_table[13].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 3 ) ) );
-		parse_table[13].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 3 ) ) );
-
-		parse_table[14].insert( make_pair( symbol( TK_END ), parse_table_item( true, 4 ) ) );
-		parse_table[14].insert( make_pair( symbol( TK_MULT ), parse_table_item( true, 4 ) ) );
-		parse_table[14].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 4 ) ) );
-		parse_table[14].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 4 ) ) );
-
-		//the EBNF substitutions
-		rules.resize( 6 );
-		rules[0].result_exp = EX_ADD;
-		rules[0].num_to_pop = 1;
-
-		rules[1].result_exp = EX_ADD;
-		rules[1].num_to_pop = 3;
-
-		rules[2].result_exp = EX_MULT;
-		rules[2].num_to_pop = 1;
-
-		rules[3].result_exp = EX_MULT;
-		rules[3].num_to_pop = 3;
-
-		rules[4].result_exp = EX_VALUE;
-		rules[4].num_to_pop = 3;
-
-		rules[5].result_exp = EX_VALUE;
-		rules[5].num_to_pop = 1;
+		init_rules();
 		
 		clear();
 	}
@@ -401,6 +305,119 @@ private:
 	{
 		item_stack.push_back( to_insert );
 		debug_print_arr();
+	}
+
+	void init_debug_map()
+	{
+#ifdef DEBUG_PARSER
+		debug_map.insert(make_pair(TK_PLUS, '+'));
+		debug_map.insert(make_pair(TK_MULT, '*'));
+		debug_map.insert(make_pair(TK_BOOL, 'B'));
+		debug_map.insert(make_pair(TK_BROP, '('));
+		debug_map.insert(make_pair(TK_BRCL, ')'));
+		debug_map.insert(make_pair(TK_END, '/'));
+
+		debug_map2.insert(make_pair(EX_VALUE, 'V'));
+		debug_map2.insert(make_pair(EX_MULT, 'M'));
+		debug_map2.insert(make_pair(EX_ADD, 'A'));
+		debug_map2.insert(make_pair(EX_EMPTY, '\\'));
+#endif
+	}
+
+	void init_rules()
+	{
+		//the EBNF substitutions
+		rules.resize(6);
+		rules[0].result_exp = EX_ADD;
+		rules[0].num_to_pop = 1;
+
+		rules[1].result_exp = EX_ADD;
+		rules[1].num_to_pop = 3;
+
+		rules[2].result_exp = EX_MULT;
+		rules[2].num_to_pop = 1;
+
+		rules[3].result_exp = EX_MULT;
+		rules[3].num_to_pop = 3;
+
+		rules[4].result_exp = EX_VALUE;
+		rules[4].num_to_pop = 3;
+
+		rules[5].result_exp = EX_VALUE;
+		rules[5].num_to_pop = 1;
+	}
+
+	void init_parse_table_precalculated()
+	{
+		parse_table.resize(NUM_STATES);
+		parse_table[0].insert(make_pair(symbol(TK_END), parse_table_item(true, -1)));
+		parse_table[0].insert(make_pair(symbol(TK_BROP), parse_table_item(false, 4)));
+		parse_table[0].insert(make_pair(symbol(TK_BOOL), parse_table_item(false, 5)));
+		parse_table[0].insert(make_pair(symbol(EX_ADD), parse_table_item(false, 1)));
+		parse_table[0].insert(make_pair(symbol(EX_MULT), parse_table_item(false, 2)));
+		parse_table[0].insert(make_pair(symbol(EX_VALUE), parse_table_item(false, 3)));
+
+		parse_table[1].insert(make_pair(symbol(TK_END), parse_table_item(true, -1)));
+
+		parse_table[2].insert(make_pair(symbol(TK_END), parse_table_item(true, 0)));
+		parse_table[2].insert(make_pair(symbol(TK_PLUS), parse_table_item(false, 6)));
+		parse_table[2].insert(make_pair(symbol(TK_BRCL), parse_table_item(true, 0)));
+
+		parse_table[3].insert(make_pair(symbol(TK_END), parse_table_item(true, 2)));
+		parse_table[3].insert(make_pair(symbol(TK_MULT), parse_table_item(false, 7)));
+		parse_table[3].insert(make_pair(symbol(TK_PLUS), parse_table_item(true, 2)));
+		parse_table[3].insert(make_pair(symbol(TK_BRCL), parse_table_item(true, 2)));
+
+		parse_table[4].insert(make_pair(symbol(TK_BROP), parse_table_item(false, 4)));
+		parse_table[4].insert(make_pair(symbol(TK_BOOL), parse_table_item(false, 12)));
+		parse_table[4].insert(make_pair(symbol(EX_ADD), parse_table_item(false, 8)));
+		parse_table[4].insert(make_pair(symbol(EX_MULT), parse_table_item(false, 10)));
+		parse_table[4].insert(make_pair(symbol(EX_VALUE), parse_table_item(false, 11)));
+
+		parse_table[5].insert(make_pair(symbol(TK_END), parse_table_item(true, 5)));
+		parse_table[5].insert(make_pair(symbol(TK_MULT), parse_table_item(true, 5)));
+		parse_table[5].insert(make_pair(symbol(TK_PLUS), parse_table_item(true, 5)));
+		parse_table[5].insert(make_pair(symbol(TK_BRCL), parse_table_item(true, 5)));
+
+		parse_table[6].insert(make_pair(symbol(TK_BROP), parse_table_item(false, 4)));
+		parse_table[6].insert(make_pair(symbol(TK_BOOL), parse_table_item(false, 12)));
+		parse_table[6].insert(make_pair(symbol(EX_ADD), parse_table_item(false, 9)));
+		parse_table[6].insert(make_pair(symbol(EX_MULT), parse_table_item(false, 10)));
+		parse_table[6].insert(make_pair(symbol(EX_VALUE), parse_table_item(false, 11)));
+
+		parse_table[7].insert(make_pair(symbol(TK_BROP), parse_table_item(false, 4)));
+		parse_table[7].insert(make_pair(symbol(TK_BOOL), parse_table_item(false, 12)));
+		parse_table[7].insert(make_pair(symbol(EX_MULT), parse_table_item(false, 13)));
+		parse_table[7].insert(make_pair(symbol(EX_VALUE), parse_table_item(false, 11)));
+
+		parse_table[8].insert(make_pair(symbol(TK_BRCL), parse_table_item(false, 14)));
+
+		parse_table[9].insert(make_pair(symbol(TK_END), parse_table_item(true, 1)));
+		parse_table[9].insert(make_pair(symbol(TK_BRCL), parse_table_item(true, 1)));
+
+		parse_table[10].insert(make_pair(symbol(TK_END), parse_table_item(true, 0)));
+		parse_table[10].insert(make_pair(symbol(TK_PLUS), parse_table_item(false, 6)));
+		parse_table[10].insert(make_pair(symbol(TK_BRCL), parse_table_item(true, 0)));
+
+		parse_table[11].insert(make_pair(symbol(TK_END), parse_table_item(true, 2)));
+		parse_table[11].insert(make_pair(symbol(TK_MULT), parse_table_item(false, 7)));
+		parse_table[11].insert(make_pair(symbol(TK_PLUS), parse_table_item(true, 2)));
+		parse_table[11].insert(make_pair(symbol(TK_BRCL), parse_table_item(true, 2)));
+
+		parse_table[12].insert(make_pair(symbol(TK_END), parse_table_item(true, 5)));
+		parse_table[12].insert(make_pair(symbol(TK_MULT), parse_table_item(true, 5)));
+		parse_table[12].insert(make_pair(symbol(TK_PLUS), parse_table_item(true, 5)));
+		parse_table[12].insert(make_pair(symbol(TK_BRCL), parse_table_item(true, 5)));
+
+		parse_table[13].insert(make_pair(symbol(TK_END), parse_table_item(true, 3)));
+		parse_table[13].insert(make_pair(symbol(TK_MULT), parse_table_item(true, 3)));
+		parse_table[13].insert(make_pair(symbol(TK_PLUS), parse_table_item(true, 3)));
+		parse_table[13].insert(make_pair(symbol(TK_BRCL), parse_table_item(true, 3)));
+
+		parse_table[14].insert(make_pair(symbol(TK_END), parse_table_item(true, 4)));
+		parse_table[14].insert(make_pair(symbol(TK_MULT), parse_table_item(true, 4)));
+		parse_table[14].insert(make_pair(symbol(TK_PLUS), parse_table_item(true, 4)));
+		parse_table[14].insert(make_pair(symbol(TK_BRCL), parse_table_item(true, 4)));
 	}
 
 public:
