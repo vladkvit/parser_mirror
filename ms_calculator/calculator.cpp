@@ -192,11 +192,33 @@ struct symbol
 	}
 };
 
+//parser stack item. In this parser design, token and state stacks are merged
+struct LR_stack_item
+{
+	symbol smb;
+
+	//since this parser doesn't need to keep a real AST,
+	//this serves as an "accumulator"
+	data_t current_value;
+
+	int state;
+
+	void insert_tok(tokens tki)
+	{
+		smb.insert_tok(tki);
+	}
+	void insert_exp(expressions ex)
+	{
+		smb.insert_exp(ex);
+	}
+};
+
 //stores a single grammar rule for the language
 struct parser_rule
 {
 	expressions result_exp; //left side of the equation
 	list<symbol> rhs;
+	bool(*callback)(const list< LR_stack_item>&);
 };
 
 //state machine helper
@@ -213,26 +235,17 @@ struct parse_table_item
 	parse_table_item( bool sr, int st ) : shift_or_reduce( sr ), new_state( st ) {}
 };
 
-//parser stack item. In this parser design, token and state stacks are merged
-struct LR_stack_item
-{
-	symbol smb;
+bool rule0_cbk(const list< LR_stack_item>& stk);
 
-	//since this parser doesn't need to keep a real AST,
-	//this serves as an "accumulator"
-	data_t current_value;
+bool rule1_cbk(const list< LR_stack_item>& stk);
 
-	int state;
+bool rule2_cbk(const list< LR_stack_item>& stk);
 
-	void insert_tok( tokens tki )
-	{
-		smb.insert_tok( tki );
-	}
-	void insert_exp( expressions ex )
-	{
-		smb.insert_exp( ex );
-	}
-};
+bool rule3_cbk(const list< LR_stack_item>& stk);
+
+bool rule4_cbk(const list< LR_stack_item>& stk);
+
+bool rule5_cbk(const list< LR_stack_item>& stk);
 
 class incremental_parser
 {
@@ -513,44 +526,32 @@ public:
 			{
 				case 0:
 				{
-					new_value = item_stack.back().current_value.d_bool;
+					new_value = rule0_cbk( item_stack );
 					break;
 				}
 				case 1:
 				{
-					bool val1 = item_stack.back().current_value.d_bool;
-					list< LR_stack_item>::reverse_iterator prev_it = item_stack.rbegin();
-					prev_it++;//can't increment by more than 1 with lists
-					prev_it++;
-					bool val2 = prev_it->current_value.d_bool;
-					new_value = val1 | val2;
+					new_value = rule1_cbk(item_stack);
 					break;
 				}
 				case 2:
 				{
-					new_value = item_stack.back().current_value.d_bool;
+					new_value = rule2_cbk(item_stack);
 					break;
 				}
 				case 3:
 				{
-					bool val1 = item_stack.back().current_value.d_bool;
-					list< LR_stack_item>::reverse_iterator prev_it = item_stack.rbegin();
-					prev_it++;//can't increment by more than 1 with lists
-					prev_it++;
-					bool val2 = prev_it->current_value.d_bool;
-					new_value = val1 & val2;
+					new_value = rule3_cbk(item_stack);
 					break;
 				}
 				case 4:
 				{
-					list< LR_stack_item>::reverse_iterator prev_it = item_stack.rbegin();
-					prev_it++;
-					new_value = prev_it->current_value.d_bool;
+					new_value = rule4_cbk(item_stack);
 					break;
 				}
 				case 5:
 				{
-					new_value = item_stack.back().current_value.d_bool;
+					new_value = rule5_cbk(item_stack);
 					break;
 				}
 
@@ -586,6 +587,50 @@ public:
 			;
 	}
 };
+
+
+bool rule0_cbk( const list< LR_stack_item>& stk)
+{
+	return stk.back().current_value.d_bool;
+}
+
+bool rule1_cbk(const list< LR_stack_item>& stk)
+{
+	bool val1 = stk.back().current_value.d_bool;
+	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
+	prev_it++;//can't increment by more than 1 with lists
+	prev_it++;
+	bool val2 = prev_it->current_value.d_bool;
+	return val1 | val2;
+}
+
+bool rule2_cbk(const list< LR_stack_item>& stk)
+{
+	return stk.back().current_value.d_bool;
+}
+
+bool rule3_cbk(const list< LR_stack_item>& stk)
+{
+	bool val1 = stk.back().current_value.d_bool;
+	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
+	prev_it++;//can't increment by more than 1 with lists
+	prev_it++;
+	bool val2 = prev_it->current_value.d_bool;
+	return val1 & val2;
+
+}
+
+bool rule4_cbk(const list< LR_stack_item>& stk)
+{
+	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
+	prev_it++;
+	return prev_it->current_value.d_bool;
+}
+
+bool rule5_cbk(const list< LR_stack_item>& stk)
+{
+	return stk.back().current_value.d_bool;
+}
 
 //on "bad" input, this function will return false.
 //one can check for parser.errors to see if input was parsed correctly

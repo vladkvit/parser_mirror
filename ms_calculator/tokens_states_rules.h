@@ -1,4 +1,7 @@
 //defines enum tokens and enum expressions
+#include <vector>
+
+using namespace std;
 
 enum tokens
 {
@@ -17,3 +20,9 @@ enum expressions
 	EX_ADD,
 	EX_EMPTY
 };
+
+
+/*void generate_rules(vector< parser_rule >& rules)
+{
+
+}*/
