@@ -196,7 +196,7 @@ struct symbol
 struct parser_rule
 {
 	expressions result_exp; //left side of the equation
-	int num_to_pop; //number of items on the right sign of the equation
+	list<symbol> rhs;
 };
 
 //state machine helper
@@ -351,22 +351,28 @@ private:
 		//the EBNF substitutions
 		rules.resize(6);
 		rules[0].result_exp = EX_ADD;
-		rules[0].num_to_pop = 1;
+		rules[0].rhs.push_back( EX_MULT );
 
 		rules[1].result_exp = EX_ADD;
-		rules[1].num_to_pop = 3;
+		rules[1].rhs.push_back(EX_MULT);
+		rules[1].rhs.push_back(TK_PLUS);
+		rules[1].rhs.push_back(EX_ADD);
 
 		rules[2].result_exp = EX_MULT;
-		rules[2].num_to_pop = 1;
+		rules[2].rhs.push_back(EX_VALUE);
 
 		rules[3].result_exp = EX_MULT;
-		rules[3].num_to_pop = 3;
+		rules[3].rhs.push_back(EX_VALUE);
+		rules[3].rhs.push_back(TK_MULT);
+		rules[3].rhs.push_back(EX_MULT);
 
 		rules[4].result_exp = EX_VALUE;
-		rules[4].num_to_pop = 3;
+		rules[4].rhs.push_back(TK_BROP);
+		rules[4].rhs.push_back(EX_ADD);
+		rules[4].rhs.push_back(TK_BRCL);
 
 		rules[5].result_exp = EX_VALUE;
-		rules[5].num_to_pop = 1;
+		rules[5].rhs.push_back( TK_BOOL );
 	}
 
 	void init_parse_table_precalculated()
@@ -553,7 +559,7 @@ public:
 					break;
 			}
 
-			for( int i = 0; i < rule.num_to_pop; i++ )
+			for( int i = 0; i < rule.rhs.size(); i++ )
 			{
 				item_stack.pop_back();
 			}
