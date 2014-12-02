@@ -81,7 +81,13 @@ struct token
 		data_b.type = DT_NONE;
 	};
 
+	token(tokens t) : name(t) {}
+
 	token( tokens t, bool b ) : name( t )
+	{
+		data_b.set(b);
+	}
+	void set_data_b(bool b)
 	{
 		data_b.set(b);
 	}
@@ -129,7 +135,7 @@ public:
 		unordered_map< char, tokens >::iterator it_finder = token_map.find( in );
 		if( it_finder != token_map.end() )
 		{
-			out.set_token( token( it_finder->second, in ) );
+			out.set_token( token( it_finder->second ) );
 			if( it_finder->second == TK_BOOL )
 			{
 				if( in == '0' )
@@ -530,7 +536,7 @@ public:
 			bool new_value = false;
 			new_value = (*rule.callback)(item_stack);
 
-			for( int i = 0; i < rule.rhs.size(); i++ )
+			for( size_t i = 0; i < rule.rhs.size(); i++ )
 			{
 				item_stack.pop_back();
 			}
@@ -611,7 +617,7 @@ bool calculator_function( string in )
 
 	in.push_back( '\n' );
 
-	for( int i = 0; i < in.length(); i++ )
+	for( size_t i = 0; i < in.length(); i++ )
 	{
 		possible_token t = lex.lexer( in[i] );
 		if( !t.has_token )
