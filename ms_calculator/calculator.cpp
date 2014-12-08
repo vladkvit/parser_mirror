@@ -1,8 +1,11 @@
 #include "stdafx.h"
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
+#include <set>
 #include <iostream>
 #include <list>
+#include <queue>
 
 //should have enum tokens, enum expressions
 #include "tokens_states_rules.h"
@@ -196,6 +199,17 @@ struct symbol
 		}
 		return other.tk < tk;
 	}
+
+	bool operator==(const symbol &other) const
+	{
+		if (expr_or_tok != other.expr_or_tok)
+			return false;
+
+		if (expr_or_tok == true)
+			return (tk == other.tk);
+		else
+			return (expr == other.expr);
+	}
 };
 
 //parser stack item. In this parser design, token and state stacks are merged
@@ -241,6 +255,11 @@ struct parse_table_item
 	parse_table_item( bool sr, int st ) : shift_or_reduce( sr ), new_state( st ) {}
 };
 
+struct parser_state
+{
+	vector<int> symbol_positions;
+};
+
 bool rule0_cbk(const list< LR_stack_item>& stk);
 
 bool rule1_cbk(const list< LR_stack_item>& stk);
@@ -265,6 +284,8 @@ private:
 	//simple SLR(1) parser. 
 
 	vector< parser_rule > rules;
+	list<parser_state> creating_parse_table_states;
+	
 	list< LR_stack_item> item_stack; //using a list because we need access to all elements
 
 #ifdef DEBUG_PARSER
@@ -324,9 +345,11 @@ public:
 
 		init_debug_map();
 
-		init_parse_table_precalculated();
-
 		init_rules();
+
+		init_parse_table_fresh();
+
+		init_parse_table_precalculated();
 		
 		clear();
 	}
@@ -398,6 +421,142 @@ private:
 		rules[5].result_exp = EX_VALUE;
 		rules[5].rhs.push_back( TK_BOOL );
 		rules[5].callback = rule5_cbk;
+	}
+
+	unordered_multimap< expressions, int > build_rule_acceleration()
+	{
+		unordered_multimap< expressions, int > rule_accel;
+
+		for (size_t i = 0; i < rules.size(); i++)
+		{
+			rule_accel.insert(make_pair(rules[i].result_exp, i));
+		}
+		return rule_accel;
+	}
+
+	unordered_multimap<expressions, tokens> calculate_first( const unordered_multimap< expressions, int > &rule_accel )
+	{
+
+		unordered_multimap<expressions, tokens> first;
+		
+		//we want to iterate over every nonterminal, but we can't iterate over an enum easily
+		//so, instead, iterate over every rule and take the LHS. Every nonterminal is guaranteed to be on the LHS of some rule
+		
+		//for every rule, take LHS. See if there's an entry in "first" - if there is, we've looked at the nonterminal before
+		//if we haven't - loop over every rule that has that nonterminal as LHS.
+
+		for (size_t i = 0; i < rules.size(); i++)
+		{
+			expressions root_key = rules[i].result_exp;
+			if (first.count(root_key) > 0)
+				continue;
+
+
+			//BFS the rules graph. 
+			queue< expressions > firsts; //holds nonterminals whose firsts should be part of "first"
+			unordered_set< expressions > visited; //hash for looking at visited nodes.
+
+			firsts.push(root_key);
+
+			while (firsts.size() > 0)
+			{
+				expressions key = firsts.front();
+				firsts.pop();
+
+				if (visited.count(key) > 0)
+				{
+					continue;
+				}
+
+				visited.insert(key);
+				
+				//get children
+				pair<unordered_multimap< expressions, int >::const_iterator,
+					unordered_multimap< expressions, int >::const_iterator> range = rule_accel.equal_range(key);
+
+				//iterate over children
+				while (range.first != range.second)
+				{
+					symbol child = rules[range.first->second].rhs.front();
+					if (child.expr_or_tok) //token
+					{
+						first.insert( make_pair(root_key, child.tk) );
+					}
+					else //nonterminal
+					{
+						firsts.push(child.expr);
+					}
+					range.first++;
+				}
+			}
+		}
+
+		return first;
+	}
+
+	map<symbol, unordered_set<tokens>> calculate_follow(const unordered_multimap< expressions, int > &rule_accel, 
+		const unordered_multimap<expressions, tokens> &first )
+	{
+		
+		map<symbol, unordered_set<tokens>> follow;
+		
+		for (size_t i = 0; i < rules.size(); i++)
+		{
+			parser_rule tmp_rule = rules[i];
+
+			list<symbol>::const_iterator it = tmp_rule.rhs.begin();
+			list<symbol>::const_iterator it2 = it;
+			it2++;
+			for ( ; it2 != tmp_rule.rhs.end(); ++it, ++it2)
+			{
+				if (it2->expr_or_tok) //token
+				{
+					map<symbol, unordered_set<tokens>>::iterator itx = follow.find(*it);
+					if (itx == follow.end())
+					{
+						itx = ( follow.insert(make_pair( *it, unordered_set<tokens>() ))).first;
+					}
+					itx->second.insert(it2->tk);
+				}
+				else
+				{
+					pair<unordered_multimap< expressions, tokens >::const_iterator,
+						unordered_multimap< expressions, tokens >::const_iterator> first_range = first.equal_range(it2->expr);
+
+					for (; first_range.first != first_range.second; first_range.first++)
+					{
+						map<symbol, unordered_set<tokens>>::iterator itx = follow.find(*it);
+						if (itx == follow.end())
+						{
+							itx = (follow.insert(make_pair(*it, unordered_set<tokens>()))).first;
+						}
+
+						itx->second.insert( first_range.first->second );
+					}
+				}
+				symbol tmp_symb(*it);
+			}
+			
+
+	
+		}
+
+		return follow;
+	}
+
+	void calculate_parse_table()
+	{
+
+	}
+
+	void init_parse_table_fresh()
+	{
+		unordered_multimap< expressions, int > rule_accel = build_rule_acceleration();
+		unordered_multimap<expressions, tokens> first = calculate_first( rule_accel );
+		map<symbol, unordered_set<tokens>> follow = calculate_follow( rule_accel, first );
+		calculate_parse_table();
+
+		int j = 1;
 	}
 
 	void init_parse_table_precalculated()

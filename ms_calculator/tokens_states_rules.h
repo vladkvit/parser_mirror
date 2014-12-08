@@ -1,8 +1,10 @@
 //defines enum tokens and enum expressions
 #include <vector>
+#include <array>
 
 using namespace std;
 
+//terminal symbols
 enum tokens
 {
 	TK_PLUS,
@@ -13,6 +15,7 @@ enum tokens
 	TK_END //no-more-characters signal
 };
 
+//nonterminal symbols
 enum expressions
 {
 	EX_VALUE,
@@ -21,6 +24,8 @@ enum expressions
 	EX_EMPTY
 };
 
+//for iterating over every element
+const std::array<expressions, 4> all_expressions = { EX_VALUE,EX_MULT,EX_ADD,EX_EMPTY };
 
 /*void generate_rules(vector< parser_rule >& rules)
 {
