@@ -7,7 +7,7 @@
 #include <list>
 #include <queue>
 
-//should have enum tokens, enum expressions
+//should have enum tokens, enum nonterminals
 #include "tokens_states_rules.h"
 
 //Boolean math expression evaluator, implemented as an SLR(1) parser
@@ -169,7 +169,7 @@ struct symbol
 	union //depending on expr_or_tok
 	{
 		tokens tk;
-		expressions expr;
+		nonterminals expr;
 	};
 
 	void insert_tok( tokens tki )
@@ -177,7 +177,7 @@ struct symbol
 		expr_or_tok = true;
 		tk = tki;
 	}
-	void insert_exp( expressions ex )
+	void insert_exp( nonterminals ex )
 	{
 		expr_or_tok = false;
 		expr = ex;
@@ -185,7 +185,7 @@ struct symbol
 
 	symbol() {}
 	symbol( tokens tki ) : expr_or_tok( true ), tk( tki ) {}
-	symbol( expressions ex ) : expr_or_tok( false ), expr( ex ) {}
+	symbol( nonterminals ex ) : expr_or_tok( false ), expr( ex ) {}
 
 	bool operator < ( const symbol& other ) const
 	{
@@ -227,7 +227,7 @@ struct LR_stack_item
 	{
 		smb.insert_tok(tki);
 	}
-	void insert_exp(expressions ex)
+	void insert_exp(nonterminals ex)
 	{
 		smb.insert_exp(ex);
 	}
@@ -236,7 +236,7 @@ struct LR_stack_item
 //stores a single grammar rule for the language
 struct parser_rule
 {
-	expressions result_exp; //left side of the equation
+	nonterminals result_exp; //left side of the equation
 	list<symbol> rhs;
 	bool(*callback)(const list< LR_stack_item>&);
 };
@@ -259,6 +259,17 @@ struct parser_state
 {
 	vector<int> symbol_positions;
 };
+
+template <typename A, typename B>
+void map_map_insert_helper( map<A, unordered_set<B>> &mp, const A &key, const B &item )
+{
+	map<A, unordered_set<B>>::iterator itx = mp.find(key);
+	if (itx == mp.end())
+	{
+		itx = (mp.insert(make_pair(key, unordered_set<B>()))).first;
+	}
+	itx->second.insert(item);
+}
 
 bool rule0_cbk(const list< LR_stack_item>& stk);
 
@@ -290,7 +301,7 @@ private:
 
 #ifdef DEBUG_PARSER
 	unordered_map< tokens, char > debug_map;
-	unordered_map< expressions, char > debug_map2;
+	unordered_map< nonterminals, char > debug_map2;
 #endif
 
 	//unordered_map could be substituted to improve performance
@@ -423,9 +434,9 @@ private:
 		rules[5].callback = rule5_cbk;
 	}
 
-	unordered_multimap< expressions, int > build_rule_acceleration()
+	unordered_multimap< nonterminals, int > build_lhs_rule_lookup()
 	{
-		unordered_multimap< expressions, int > rule_accel;
+		unordered_multimap< nonterminals, int > rule_accel;
 
 		for (size_t i = 0; i < rules.size(); i++)
 		{
@@ -434,11 +445,89 @@ private:
 		return rule_accel;
 	}
 
-	unordered_multimap<expressions, tokens> calculate_first( const unordered_multimap< expressions, int > &rule_accel )
+	/*unordered_multimap< symbol, int > build_rhs_rule_lookup()
+	{
+		unordered_multimap< symbol, int > rule_accel;
+
+		for (size_t i = 0; i < rules.size(); i++)
+		{
+			rule_accel.insert(make_pair(rules[i].rhs.back(), i));
+		}
+		return rule_accel;
+	}*/
+
+	unordered_set< tokens > calculate_first(const unordered_multimap< nonterminals, int > &lhs_accel, nonterminals NT, unordered_set< nonterminals >& visited  )
+	{
+		unordered_set< tokens > first;
+
+
+		
+
+		if (visited.count( NT ) > 0)
+		{
+			return first;
+		}
+
+		visited.insert( NT );
+
+		//get rules
+		pair<unordered_multimap< nonterminals, int >::const_iterator,
+			unordered_multimap< nonterminals, int >::const_iterator> range = lhs_accel.equal_range(NT);
+
+		//iterate over rules
+		while (range.first != range.second)
+		{
+			list<symbol>::iterator rule_it = rules[range.first->second].rhs.begin();
+
+			while (rule_it != rules[range.first->second].rhs.end())
+			{
+				symbol child = *rule_it;
+
+				//if there is a production X->b, then First(X) includes b
+				if (child.expr_or_tok) //token
+				{
+					first.insert(child.tk);
+					break;
+				}
+				//if there is a production X->Y1Y2..Yk, then FIRST(X) includes FIRST(Y1Y2..Yk)
+				//FIRST(Y1Y2..Yk) is just FIRST( Y1 ) if FIRST( Y1 ) does not contain epsilon
+				else //nonterminal
+				{
+					unordered_set< tokens > tks = calculate_first(lhs_accel, child.expr, visited);
+
+					first.insert(tks.begin(), tks.end());
+
+					if (tks.count(TK_EPSILON) == 0)
+						break;
+
+					first.erase(TK_EPSILON);
+					
+				}
+				
+				rule_it++;
+			}
+			if (rule_it == rules[range.first->second].rhs.end())
+			{
+				first.insert(TK_EPSILON);
+			}
+			range.first++;
+		}
+
+
+		return first;
+	}
+
+	//If we imagine the first set as a dependency graph, 
+	//finding the FIRST set an be thought of as finding all the destinations from every point
+	//lhs_accel outputs rule indeces when queried with the LHS of an expression
+	unordered_multimap< nonterminals, tokens> calculate_first_set( const unordered_multimap< nonterminals, int > &lhs_accel )
 	{
 
-		unordered_multimap<expressions, tokens> first;
+		unordered_multimap<nonterminals, tokens> first;
 		
+		//This implementation is the "naive foreach rule, do DFS" approach.
+		//For speedup, look into algorithms here: http://en.wikipedia.org/wiki/Reachability or implement Dynamic Programming
+
 		//we want to iterate over every nonterminal, but we can't iterate over an enum easily
 		//so, instead, iterate over every rule and take the LHS. Every nonterminal is guaranteed to be on the LHS of some rule
 		
@@ -447,55 +536,30 @@ private:
 
 		for (size_t i = 0; i < rules.size(); i++)
 		{
-			expressions root_key = rules[i].result_exp;
+			nonterminals root_key = rules[i].result_exp;
 			if (first.count(root_key) > 0)
 				continue;
 
 
-			//BFS the rules graph. 
-			queue< expressions > firsts; //holds nonterminals whose firsts should be part of "first"
-			unordered_set< expressions > visited; //hash for looking at visited nodes.
+			//DFS the rules graph. 
+			//queue< nonterminals > firsts; //holds nonterminals whose firsts should be part of "first"
+			unordered_set< nonterminals > visited; //hash for looking at visited nodes.
 
-			firsts.push(root_key);
+			//firsts.push(root_key);
+			unordered_set< tokens > first_symbol_set = calculate_first(lhs_accel, root_key, visited);
 
-			while (firsts.size() > 0)
+			for (unordered_set< tokens >::iterator sit = first_symbol_set.begin(); sit != first_symbol_set.end(); ++sit)
 			{
-				expressions key = firsts.front();
-				firsts.pop();
-
-				if (visited.count(key) > 0)
-				{
-					continue;
-				}
-
-				visited.insert(key);
-				
-				//get children
-				pair<unordered_multimap< expressions, int >::const_iterator,
-					unordered_multimap< expressions, int >::const_iterator> range = rule_accel.equal_range(key);
-
-				//iterate over children
-				while (range.first != range.second)
-				{
-					symbol child = rules[range.first->second].rhs.front();
-					if (child.expr_or_tok) //token
-					{
-						first.insert( make_pair(root_key, child.tk) );
-					}
-					else //nonterminal
-					{
-						firsts.push(child.expr);
-					}
-					range.first++;
-				}
+				first.insert(make_pair(root_key, *sit));
 			}
 		}
 
 		return first;
 	}
 
-	map<symbol, unordered_set<tokens>> calculate_follow(const unordered_multimap< expressions, int > &rule_accel, 
-		const unordered_multimap<expressions, tokens> &first )
+	/*map<symbol, unordered_set<tokens>> calculate_follow(const unordered_multimap< nonterminals, int > &lhs_accel,
+		const unordered_multimap< symbol, int > &rhs_accel,
+		const unordered_multimap<nonterminals, tokens> &first )
 	{
 		
 		map<symbol, unordered_set<tokens>> follow;
@@ -511,38 +575,53 @@ private:
 			{
 				if (it2->expr_or_tok) //token
 				{
-					map<symbol, unordered_set<tokens>>::iterator itx = follow.find(*it);
-					if (itx == follow.end())
-					{
-						itx = ( follow.insert(make_pair( *it, unordered_set<tokens>() ))).first;
-					}
-					itx->second.insert(it2->tk);
+					map_map_insert_helper<symbol, tokens>(follow, *it, it2->tk);
 				}
 				else
 				{
-					pair<unordered_multimap< expressions, tokens >::const_iterator,
-						unordered_multimap< expressions, tokens >::const_iterator> first_range = first.equal_range(it2->expr);
+					pair<unordered_multimap< nonterminals, tokens >::const_iterator,
+						unordered_multimap< nonterminals, tokens >::const_iterator> first_range = first.equal_range(it2->expr);
 
 					for (; first_range.first != first_range.second; first_range.first++)
 					{
-						map<symbol, unordered_set<tokens>>::iterator itx = follow.find(*it);
-						if (itx == follow.end())
-						{
-							itx = (follow.insert(make_pair(*it, unordered_set<tokens>()))).first;
-						}
-
-						itx->second.insert( first_range.first->second );
+						map_map_insert_helper<symbol, tokens>(follow, *it, first_range.first->second);
 					}
 				}
 				symbol tmp_symb(*it);
 			}
 			
+			//at this point, "it" should be pointing to the last element of the list
 
-	
+			queue<symbol> bfs_queue;
+			set<symbol> visited_set;
+			bfs_queue.push(*it);
+
+			while (bfs_queue.size() > 0)
+			{
+				symbol end_symbol = bfs_queue.front();
+				bfs_queue.pop();
+
+				if (visited_set.count(end_symbol) > 0)
+					continue;
+
+				visited_set.insert(end_symbol);
+
+				pair< unordered_multimap< symbol, int >::const_iterator,
+					unordered_multimap< symbol, int >::const_iterator > start_rules = rhs_accel.equal_range(end_symbol);
+
+				for (; start_rules.first != start_rules.second; start_rules.first++)
+				{
+					nonterminals lhs = rules[start_rules.first->second].result_exp;
+
+					
+					//map_map_insert_helper<symbol, tokens>(follow, *it, );
+				}
+
+			}
 		}
 
 		return follow;
-	}
+	}*/
 
 	void calculate_parse_table()
 	{
@@ -551,9 +630,10 @@ private:
 
 	void init_parse_table_fresh()
 	{
-		unordered_multimap< expressions, int > rule_accel = build_rule_acceleration();
-		unordered_multimap<expressions, tokens> first = calculate_first( rule_accel );
-		map<symbol, unordered_set<tokens>> follow = calculate_follow( rule_accel, first );
+		unordered_multimap< nonterminals, int > lhs_accel = build_lhs_rule_lookup();
+		//unordered_multimap< symbol, int > rhs_accel = build_rhs_rule_lookup();
+		unordered_multimap<nonterminals, tokens> first = calculate_first_set(lhs_accel);
+		//map<symbol, unordered_set<tokens>> follow = calculate_follow(lhs_accel, rhs_accel, first );
 		calculate_parse_table();
 
 		int j = 1;
@@ -660,6 +740,7 @@ public:
 		}
 
 		parse_table_item itm = it->second;
+		//TODO - add actual rule for accepting
 		if( itm.reduce_rule == -1 ) //flag for accepting
 		{
 			data_t cur_val = item_stack.back().current_value;
