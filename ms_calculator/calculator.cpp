@@ -1,11 +1,4 @@
 #include "stdafx.h"
-#include <unordered_map>
-#include <unordered_set>
-#include <map>
-#include <set>
-#include <iostream>
-#include <list>
-#include <queue>
 
 //should have enum tokens, enum nonterminals
 #include "tokens_states_rules.h"
@@ -475,7 +468,7 @@ private:
 		return rule_accel;
 	}
 
-	unordered_set< tokens > calculate_first( const unordered_multimap< nonterminals, int > &lhs_accel, symbol NT, unordered_set< nonterminals >& visited )
+	unordered_set< tokens > calculate_first( const unordered_multimap< nonterminals, int > &lhs_accel, symbol NT, unordered_set< nonterminals >& visited ) const
 	{
 		unordered_set< tokens > first;
 
@@ -524,7 +517,6 @@ private:
 						break;
 
 					first.erase( TK_EPSILON );
-
 				}
 
 				rule_it++;
@@ -536,16 +528,14 @@ private:
 			range.first++;
 		}
 
-
 		return first;
 	}
 
 	//If we imagine the first set as a dependency graph, 
 	//finding the FIRST set an be thought of as finding all the destinations from every point
 	//lhs_accel outputs rule indeces when queried with the LHS of an expression
-	unordered_multimap<symbol, tokens> calculate_first_set( const unordered_multimap< nonterminals, int > &lhs_accel )
+	unordered_multimap<symbol, tokens> calculate_first_set( const unordered_multimap< nonterminals, int > &lhs_accel ) const
 	{
-
 		unordered_multimap<symbol, tokens> first;
 
 		//This implementation is the "naive foreach rule, do DFS" approach.
@@ -587,7 +577,7 @@ private:
 		const unordered_multimap< symbol, pair< size_t, size_t> > &rhs_accel,
 		const unordered_multimap< symbol, tokens > &first,
 		nonterminals NT,
-		unordered_set<nonterminals> &visited )
+		unordered_set<nonterminals> &visited ) const
 	{
 		unordered_set< tokens > follow;
 
@@ -643,9 +633,8 @@ private:
 
 	unordered_multimap<nonterminals, tokens> calculate_follow_set(
 		const unordered_multimap< symbol, pair<size_t, size_t> > &rhs_accel,
-		const unordered_multimap< symbol, tokens > &first )
+		const unordered_multimap< symbol, tokens > &first ) const
 	{
-
 		unordered_multimap<nonterminals, tokens> follow;
 
 		//we're trying to iterate over every nonterminal
@@ -653,11 +642,6 @@ private:
 		for( size_t i = 0; i < rules.size(); i++ )
 		{
 			symbol root_key = symbol( rules[i].result_exp );
-			if( root_key.nonterm_or_tok )
-			{
-				printf( "Invalid rule detected" );
-				break;
-			}
 
 			if( follow.count( root_key.expr ) > 0 )
 				continue;
@@ -673,6 +657,7 @@ private:
 			}
 		}
 
+		assert( follow.size() > 0 );
 		return follow;
 	}
 
