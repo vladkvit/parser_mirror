@@ -165,8 +165,8 @@ public:
 
 struct symbol
 {
-	bool expr_or_tok; //if token then true, if expression then false
-	union //depending on expr_or_tok
+	bool nonterm_or_tok; //if token then true, if nonterminal then false
+	union //depending on nonterm_or_tok
 	{
 		tokens tk;
 		nonterminals expr;
@@ -174,26 +174,26 @@ struct symbol
 
 	void insert_tok( tokens tki )
 	{
-		expr_or_tok = true;
+		nonterm_or_tok = true;
 		tk = tki;
 	}
 	void insert_exp( nonterminals ex )
 	{
-		expr_or_tok = false;
+		nonterm_or_tok = false;
 		expr = ex;
 	}
 
 	symbol() {}
-	symbol( tokens tki ) : expr_or_tok( true ), tk( tki ) {}
-	symbol( nonterminals ex ) : expr_or_tok( false ), expr( ex ) {}
+	symbol( tokens tki ) : nonterm_or_tok( true ), tk( tki ) {}
+	symbol( nonterminals ex ) : nonterm_or_tok( false ), expr( ex ) {}
 
 	bool operator < ( const symbol& other ) const
 	{
-		if( other.expr_or_tok != expr_or_tok )
+		if( other.nonterm_or_tok != nonterm_or_tok )
 		{
-			return expr_or_tok;
+			return nonterm_or_tok;
 		}
-		if( expr_or_tok )
+		if( nonterm_or_tok )
 		{
 			return other.expr < expr;
 		}
@@ -202,13 +202,28 @@ struct symbol
 
 	bool operator==(const symbol &other) const
 	{
-		if (expr_or_tok != other.expr_or_tok)
+		if (nonterm_or_tok != other.nonterm_or_tok)
 			return false;
 
-		if (expr_or_tok == true)
+		if (nonterm_or_tok == true)
 			return (tk == other.tk);
 		else
 			return (expr == other.expr);
+	}
+};
+
+template<>
+class hash<symbol> {
+public:
+	size_t operator()(const symbol &c) const
+	{
+		//when switching over to enum classes, this will have to change.
+		// see http://stackoverflow.com/questions/18837857/cant-use-enum-class-as-unordered-map-key
+		// and http://stackoverflow.com/questions/9646297/c11-hash-function-for-any-enum-type
+		if( c.nonterm_or_tok )
+			return hash<int>()(c.tk) ^ (int)c.nonterm_or_tok;
+		else
+			return hash<int>()(c.expr) ^ (int)c.nonterm_or_tok;
 	}
 };
 
@@ -237,7 +252,7 @@ struct LR_stack_item
 struct parser_rule
 {
 	nonterminals result_exp; //left side of the equation
-	list<symbol> rhs;
+	vector<symbol> rhs;
 	bool(*callback)(const list< LR_stack_item>&);
 };
 
@@ -316,7 +331,7 @@ private:
 #ifdef DEBUG_PARSER
 		for( list<LR_stack_item>::iterator it = item_stack.begin(); it != item_stack.end(); ++it )
 		{
-			if( it->smb.expr_or_tok )
+			if( it->smb.nonterm_or_tok )
 			{
 				printf( "%c", debug_map[it->smb.tk] );
 				if( it->smb.tk == TK_BOOL )
@@ -445,46 +460,54 @@ private:
 		return rule_accel;
 	}
 
-	/*unordered_multimap< symbol, int > build_rhs_rule_lookup()
+	//returns a lookup table for a symbol to its position(s) in the RHS of rules
+	unordered_multimap< symbol, pair<size_t, size_t> > build_rhs_rule_lookup()
 	{
-		unordered_multimap< symbol, int > rule_accel;
+		unordered_multimap< symbol, pair<size_t, size_t> > rule_accel;
 
 		for (size_t i = 0; i < rules.size(); i++)
 		{
-			rule_accel.insert(make_pair(rules[i].rhs.back(), i));
+			for (size_t j = 0; j < rules[i].rhs.size(); j++)
+			{
+				rule_accel.insert(make_pair(rules[i].rhs[j], pair<size_t, size_t>(i, j)));
+			}
 		}
 		return rule_accel;
-	}*/
+	}
 
-	unordered_set< tokens > calculate_first(const unordered_multimap< nonterminals, int > &lhs_accel, nonterminals NT, unordered_set< nonterminals >& visited  )
+	unordered_set< tokens > calculate_first(const unordered_multimap< nonterminals, int > &lhs_accel, symbol NT, unordered_set< nonterminals >& visited  )
 	{
 		unordered_set< tokens > first;
 
-
+		if (NT.nonterm_or_tok)
+		{
+			first.insert(NT.tk);
+			return first;
+		}
 		
 
-		if (visited.count( NT ) > 0)
+		if (visited.count( NT.expr ) > 0)
 		{
 			return first;
 		}
 
-		visited.insert( NT );
+		visited.insert(NT.expr);
 
 		//get rules
 		pair<unordered_multimap< nonterminals, int >::const_iterator,
-			unordered_multimap< nonterminals, int >::const_iterator> range = lhs_accel.equal_range(NT);
+			unordered_multimap< nonterminals, int >::const_iterator> range = lhs_accel.equal_range(NT.expr);
 
 		//iterate over rules
 		while (range.first != range.second)
 		{
-			list<symbol>::iterator rule_it = rules[range.first->second].rhs.begin();
+			vector<symbol>::const_iterator rule_it = rules[range.first->second].rhs.begin();
 
 			while (rule_it != rules[range.first->second].rhs.end())
 			{
 				symbol child = *rule_it;
 
 				//if there is a production X->b, then First(X) includes b
-				if (child.expr_or_tok) //token
+				if (child.nonterm_or_tok) //token
 				{
 					first.insert(child.tk);
 					break;
@@ -520,10 +543,10 @@ private:
 	//If we imagine the first set as a dependency graph, 
 	//finding the FIRST set an be thought of as finding all the destinations from every point
 	//lhs_accel outputs rule indeces when queried with the LHS of an expression
-	unordered_multimap< nonterminals, tokens> calculate_first_set( const unordered_multimap< nonterminals, int > &lhs_accel )
+	unordered_multimap<symbol, tokens> calculate_first_set( const unordered_multimap< nonterminals, int > &lhs_accel )
 	{
 
-		unordered_multimap<nonterminals, tokens> first;
+		unordered_multimap<symbol, tokens> first;
 		
 		//This implementation is the "naive foreach rule, do DFS" approach.
 		//For speedup, look into algorithms here: http://en.wikipedia.org/wiki/Reachability or implement Dynamic Programming
@@ -536,92 +559,122 @@ private:
 
 		for (size_t i = 0; i < rules.size(); i++)
 		{
-			nonterminals root_key = rules[i].result_exp;
+			symbol root_key = symbol( rules[i].result_exp );
 			if (first.count(root_key) > 0)
 				continue;
 
 
 			//DFS the rules graph. 
-			//queue< nonterminals > firsts; //holds nonterminals whose firsts should be part of "first"
 			unordered_set< nonterminals > visited; //hash for looking at visited nodes.
 
-			//firsts.push(root_key);
 			unordered_set< tokens > first_symbol_set = calculate_first(lhs_accel, root_key, visited);
 
-			for (unordered_set< tokens >::iterator sit = first_symbol_set.begin(); sit != first_symbol_set.end(); ++sit)
+			for (unordered_set< tokens >::const_iterator sit = first_symbol_set.begin(); sit != first_symbol_set.end(); ++sit)
 			{
 				first.insert(make_pair(root_key, *sit));
 			}
 		}
 
+		for (size_t i = 0; i < all_terminals.size(); i++)
+		{
+			first.insert(make_pair(symbol(all_terminals[i]), all_terminals[i]));
+		}
+
 		return first;
 	}
 
-	/*map<symbol, unordered_set<tokens>> calculate_follow(const unordered_multimap< nonterminals, int > &lhs_accel,
-		const unordered_multimap< symbol, int > &rhs_accel,
-		const unordered_multimap<nonterminals, tokens> &first )
+	unordered_set< tokens > calculate_follow(
+		const unordered_multimap< symbol, pair< size_t, size_t> > &rhs_accel,
+		const unordered_multimap< symbol, tokens > &first,
+		nonterminals NT,
+		unordered_set<nonterminals> &visited )
 	{
-		
-		map<symbol, unordered_set<tokens>> follow;
-		
-		for (size_t i = 0; i < rules.size(); i++)
+		unordered_set< tokens > follow;
+
+		if (visited.count(NT) > 0)
+			return follow;
+
+		visited.insert(NT);
+
+		//find out where in the rules on the RHS the nonterminal occurs
+		pair<unordered_multimap< symbol, pair< size_t, size_t> >::const_iterator,
+			unordered_multimap< symbol, pair< size_t, size_t> >::const_iterator> range = rhs_accel.equal_range(NT);
+
+		for (; range.first != range.second; ++range.first)
 		{
-			parser_rule tmp_rule = rules[i];
+			//A->aB, then FOLLOW(B) incl. FOLLOW(A)
+			//A->aBbc, then FOLLOW(B) incl. FIRST(b)
+			//if FIRST(b) incl. eps, then FOLLOW(B) incl. FISRT(c)
+			//if FIRST(b) incl. eps, then FOLLOW(B) incl. FOLLOW(A)
 
-			list<symbol>::const_iterator it = tmp_rule.rhs.begin();
-			list<symbol>::const_iterator it2 = it;
-			it2++;
-			for ( ; it2 != tmp_rule.rhs.end(); ++it, ++it2)
+			size_t rule_index = range.first->second.first;
+			size_t next_position = range.first->second.second + 1; //looking at the next symbol
+			while(next_position < rules[rule_index].rhs.size() ) //our symbol isn't the last item in the RHS
 			{
-				if (it2->expr_or_tok) //token
-				{
-					map_map_insert_helper<symbol, tokens>(follow, *it, it2->tk);
-				}
-				else
-				{
-					pair<unordered_multimap< nonterminals, tokens >::const_iterator,
-						unordered_multimap< nonterminals, tokens >::const_iterator> first_range = first.equal_range(it2->expr);
+				//A->aBbc, then FOLLOW(B) incl. FIRST(b)
+				symbol first_finder = rules[rule_index].rhs[next_position];
+				pair<unordered_multimap< symbol, tokens >::const_iterator,
+					unordered_multimap< symbol, tokens>::const_iterator> range2 = first.equal_range(first_finder);
 
-					for (; first_range.first != first_range.second; first_range.first++)
-					{
-						map_map_insert_helper<symbol, tokens>(follow, *it, first_range.first->second);
-					}
+				for (; range2.first != range2.second; ++range2.first)
+				{
+					follow.insert(range2.first->second);
 				}
-				symbol tmp_symb(*it);
+				if (follow.count(TK_EPSILON) == 0)
+					break;
+
+				follow.erase(TK_EPSILON);
+
+				next_position++;
 			}
-			
-			//at this point, "it" should be pointing to the last element of the list
-
-			queue<symbol> bfs_queue;
-			set<symbol> visited_set;
-			bfs_queue.push(*it);
-
-			while (bfs_queue.size() > 0)
+			if (next_position >= rules[rule_index].rhs.size() )
 			{
-				symbol end_symbol = bfs_queue.front();
-				bfs_queue.pop();
-
-				if (visited_set.count(end_symbol) > 0)
-					continue;
-
-				visited_set.insert(end_symbol);
-
-				pair< unordered_multimap< symbol, int >::const_iterator,
-					unordered_multimap< symbol, int >::const_iterator > start_rules = rhs_accel.equal_range(end_symbol);
-
-				for (; start_rules.first != start_rules.second; start_rules.first++)
+				//A->aB, then FOLLOW(B) incl. FOLLOW(A)
+				unordered_set< tokens > extr_follow = calculate_follow( rhs_accel, first, rules[rule_index].result_exp, visited);
+				for (unordered_set< tokens >::const_iterator it = extr_follow.begin(); it != extr_follow.end(); ++it)
 				{
-					nonterminals lhs = rules[start_rules.first->second].result_exp;
-
-					
-					//map_map_insert_helper<symbol, tokens>(follow, *it, );
+					follow.insert(*it);
 				}
-
 			}
 		}
 
 		return follow;
-	}*/
+	}
+
+	unordered_multimap<nonterminals, tokens> calculate_follow_set(
+		const unordered_multimap< symbol, pair<size_t, size_t> > &rhs_accel,
+		const unordered_multimap< symbol, tokens > &first )
+	{
+		
+		unordered_multimap<nonterminals, tokens> follow;
+		
+		//we're trying to iterate over every nonterminal
+		//for every rule
+		for (size_t i = 0; i < rules.size(); i++)
+		{
+			symbol root_key = symbol(rules[i].result_exp);
+			if (root_key.nonterm_or_tok)
+			{
+				printf("Invalid rule detected");
+				break;
+			}
+			
+			if (follow.count(root_key.expr) > 0)
+				continue;
+
+			//DFS the rules graph.
+			unordered_set< nonterminals > visited; //hash for looking at visited nodes.
+
+			unordered_set< tokens > follow_symbol_set = calculate_follow( rhs_accel, first, root_key.expr, visited);
+
+			for (unordered_set< tokens >::iterator sit = follow_symbol_set.begin(); sit != follow_symbol_set.end(); ++sit)
+			{
+				follow.insert(make_pair(root_key.expr, *sit));
+			}
+		}
+
+		return follow;
+	}
 
 	void calculate_parse_table()
 	{
@@ -631,9 +684,9 @@ private:
 	void init_parse_table_fresh()
 	{
 		unordered_multimap< nonterminals, int > lhs_accel = build_lhs_rule_lookup();
-		//unordered_multimap< symbol, int > rhs_accel = build_rhs_rule_lookup();
-		unordered_multimap<nonterminals, tokens> first = calculate_first_set(lhs_accel);
-		//map<symbol, unordered_set<tokens>> follow = calculate_follow(lhs_accel, rhs_accel, first );
+		unordered_multimap< symbol, pair<size_t, size_t> > rhs_accel = build_rhs_rule_lookup();
+		unordered_multimap< symbol, tokens> first = calculate_first_set(lhs_accel);
+		unordered_multimap<nonterminals, tokens> follow = calculate_follow_set( rhs_accel, first );
 		calculate_parse_table();
 
 		int j = 1;
