@@ -14,6 +14,7 @@
 
 using namespace std;
 
+//it's convenient to have a datatype that can represent either a terminal or a nonterminal
 struct symbol
 {
 	bool nonterm_or_tok; //if token then true, if nonterminal then false
@@ -108,7 +109,7 @@ struct parser_rule
 };
 
 //state machine helper
-struct parse_table_item
+struct action_goto_table_item
 {
 	bool shift_or_reduce; //false=shift, true=reduce
 	union
@@ -117,8 +118,8 @@ struct parse_table_item
 		int reduce_rule;
 	};
 
-	parse_table_item() {}
-	parse_table_item( bool sr, int st ) : shift_or_reduce( sr ), new_state( st ) {}
+	action_goto_table_item() {}
+	action_goto_table_item( bool sr, int st ) : shift_or_reduce( sr ), new_state( st ) {}
 };
 
 struct parser_state
@@ -163,7 +164,7 @@ private:
 	//simple SLR(1) parser. 
 
 	vector< parser_rule > rules;
-	list<parser_state> creating_parse_table_states;
+	list<parser_state> creating_action_goto_table_states;
 
 	list< LR_stack_item> item_stack; //using a list because we need access to all elements
 
@@ -173,7 +174,7 @@ private:
 #endif
 
 	//unordered_map could be substituted to improve performance
-	vector< map< symbol, parse_table_item > > parse_table;
+	vector< map< symbol, action_goto_table_item > > action_goto_table;
 
 	map< symbol, tokens > follow_table;
 
@@ -217,7 +218,7 @@ public:
 		//VALUE -> ( ADD ) | bool
 
 		//This expands to 15 SLR states. 
-		//The states and the transitions are stored in parse_table
+		//The states and the transitions are stored in action_goto_table
 		//For deriving state transitions, see SLR parse table derivation
 
 		//The rules are stored in "rules"
@@ -226,9 +227,9 @@ public:
 
 		init_rules();
 
-		init_parse_table_fresh();
+		init_action_goto_table_fresh();
 
-		init_parse_table_precalculated();
+		init_action_goto_table_precalculated();
 
 		clear();
 	}
@@ -518,91 +519,91 @@ private:
 		return follow;
 	}
 
-	void calculate_parse_table()
+	void calculate_action_goto_table()
 	{
 
 	}
 
-	void init_parse_table_fresh()
+	void init_action_goto_table_fresh()
 	{
 		unordered_multimap< nonterminals, int > lhs_accel = build_lhs_rule_lookup();
 		unordered_multimap< symbol, pair< size_t, size_t > > rhs_accel = build_rhs_rule_lookup();
 		unordered_multimap< symbol, tokens > first = calculate_first_set( lhs_accel );
 		unordered_multimap< nonterminals, tokens > follow = calculate_follow_set( rhs_accel, first );
-		calculate_parse_table();
+		calculate_action_goto_table();
 	}
 
-	void init_parse_table_precalculated()
+	void init_action_goto_table_precalculated()
 	{
-		parse_table.resize( NUM_STATES );
-		parse_table[0].insert( make_pair( symbol( TK_END ), parse_table_item( true, -1 ) ) );
-		parse_table[0].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 4 ) ) );
-		parse_table[0].insert( make_pair( symbol( TK_BOOL ), parse_table_item( false, 5 ) ) );
-		parse_table[0].insert( make_pair( symbol( EX_ADD ), parse_table_item( false, 1 ) ) );
-		parse_table[0].insert( make_pair( symbol( EX_MULT ), parse_table_item( false, 2 ) ) );
-		parse_table[0].insert( make_pair( symbol( EX_VALUE ), parse_table_item( false, 3 ) ) );
+		action_goto_table.resize( NUM_STATES );
+		action_goto_table[0].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, -1 ) ) );
+		action_goto_table[0].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
+		action_goto_table[0].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 5 ) ) );
+		action_goto_table[0].insert( make_pair( symbol( EX_ADD ), action_goto_table_item( false, 1 ) ) );
+		action_goto_table[0].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 2 ) ) );
+		action_goto_table[0].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 3 ) ) );
 
-		parse_table[1].insert( make_pair( symbol( TK_END ), parse_table_item( true, -1 ) ) );
+		action_goto_table[1].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, -1 ) ) );
 
-		parse_table[2].insert( make_pair( symbol( TK_END ), parse_table_item( true, 0 ) ) );
-		parse_table[2].insert( make_pair( symbol( TK_PLUS ), parse_table_item( false, 6 ) ) );
-		parse_table[2].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 0 ) ) );
+		action_goto_table[2].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 0 ) ) );
+		action_goto_table[2].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( false, 6 ) ) );
+		action_goto_table[2].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 0 ) ) );
 
-		parse_table[3].insert( make_pair( symbol( TK_END ), parse_table_item( true, 2 ) ) );
-		parse_table[3].insert( make_pair( symbol( TK_MULT ), parse_table_item( false, 7 ) ) );
-		parse_table[3].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 2 ) ) );
-		parse_table[3].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 2 ) ) );
+		action_goto_table[3].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 2 ) ) );
+		action_goto_table[3].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( false, 7 ) ) );
+		action_goto_table[3].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 2 ) ) );
+		action_goto_table[3].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 2 ) ) );
 
-		parse_table[4].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 4 ) ) );
-		parse_table[4].insert( make_pair( symbol( TK_BOOL ), parse_table_item( false, 12 ) ) );
-		parse_table[4].insert( make_pair( symbol( EX_ADD ), parse_table_item( false, 8 ) ) );
-		parse_table[4].insert( make_pair( symbol( EX_MULT ), parse_table_item( false, 10 ) ) );
-		parse_table[4].insert( make_pair( symbol( EX_VALUE ), parse_table_item( false, 11 ) ) );
+		action_goto_table[4].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
+		action_goto_table[4].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 12 ) ) );
+		action_goto_table[4].insert( make_pair( symbol( EX_ADD ), action_goto_table_item( false, 8 ) ) );
+		action_goto_table[4].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 10 ) ) );
+		action_goto_table[4].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 11 ) ) );
 
-		parse_table[5].insert( make_pair( symbol( TK_END ), parse_table_item( true, 5 ) ) );
-		parse_table[5].insert( make_pair( symbol( TK_MULT ), parse_table_item( true, 5 ) ) );
-		parse_table[5].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 5 ) ) );
-		parse_table[5].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 5 ) ) );
+		action_goto_table[5].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[5].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[5].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[5].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 5 ) ) );
 
-		parse_table[6].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 4 ) ) );
-		parse_table[6].insert( make_pair( symbol( TK_BOOL ), parse_table_item( false, 12 ) ) );
-		parse_table[6].insert( make_pair( symbol( EX_ADD ), parse_table_item( false, 9 ) ) );
-		parse_table[6].insert( make_pair( symbol( EX_MULT ), parse_table_item( false, 10 ) ) );
-		parse_table[6].insert( make_pair( symbol( EX_VALUE ), parse_table_item( false, 11 ) ) );
+		action_goto_table[6].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
+		action_goto_table[6].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 12 ) ) );
+		action_goto_table[6].insert( make_pair( symbol( EX_ADD ), action_goto_table_item( false, 9 ) ) );
+		action_goto_table[6].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 10 ) ) );
+		action_goto_table[6].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 11 ) ) );
 
-		parse_table[7].insert( make_pair( symbol( TK_BROP ), parse_table_item( false, 4 ) ) );
-		parse_table[7].insert( make_pair( symbol( TK_BOOL ), parse_table_item( false, 12 ) ) );
-		parse_table[7].insert( make_pair( symbol( EX_MULT ), parse_table_item( false, 13 ) ) );
-		parse_table[7].insert( make_pair( symbol( EX_VALUE ), parse_table_item( false, 11 ) ) );
+		action_goto_table[7].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
+		action_goto_table[7].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 12 ) ) );
+		action_goto_table[7].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 13 ) ) );
+		action_goto_table[7].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 11 ) ) );
 
-		parse_table[8].insert( make_pair( symbol( TK_BRCL ), parse_table_item( false, 14 ) ) );
+		action_goto_table[8].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( false, 14 ) ) );
 
-		parse_table[9].insert( make_pair( symbol( TK_END ), parse_table_item( true, 1 ) ) );
-		parse_table[9].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 1 ) ) );
+		action_goto_table[9].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 1 ) ) );
+		action_goto_table[9].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 1 ) ) );
 
-		parse_table[10].insert( make_pair( symbol( TK_END ), parse_table_item( true, 0 ) ) );
-		parse_table[10].insert( make_pair( symbol( TK_PLUS ), parse_table_item( false, 6 ) ) );
-		parse_table[10].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 0 ) ) );
+		action_goto_table[10].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 0 ) ) );
+		action_goto_table[10].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( false, 6 ) ) );
+		action_goto_table[10].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 0 ) ) );
 
-		parse_table[11].insert( make_pair( symbol( TK_END ), parse_table_item( true, 2 ) ) );
-		parse_table[11].insert( make_pair( symbol( TK_MULT ), parse_table_item( false, 7 ) ) );
-		parse_table[11].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 2 ) ) );
-		parse_table[11].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 2 ) ) );
+		action_goto_table[11].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 2 ) ) );
+		action_goto_table[11].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( false, 7 ) ) );
+		action_goto_table[11].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 2 ) ) );
+		action_goto_table[11].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 2 ) ) );
 
-		parse_table[12].insert( make_pair( symbol( TK_END ), parse_table_item( true, 5 ) ) );
-		parse_table[12].insert( make_pair( symbol( TK_MULT ), parse_table_item( true, 5 ) ) );
-		parse_table[12].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 5 ) ) );
-		parse_table[12].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 5 ) ) );
+		action_goto_table[12].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[12].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[12].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[12].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 5 ) ) );
 
-		parse_table[13].insert( make_pair( symbol( TK_END ), parse_table_item( true, 3 ) ) );
-		parse_table[13].insert( make_pair( symbol( TK_MULT ), parse_table_item( true, 3 ) ) );
-		parse_table[13].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 3 ) ) );
-		parse_table[13].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 3 ) ) );
+		action_goto_table[13].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 3 ) ) );
+		action_goto_table[13].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 3 ) ) );
+		action_goto_table[13].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 3 ) ) );
+		action_goto_table[13].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 3 ) ) );
 
-		parse_table[14].insert( make_pair( symbol( TK_END ), parse_table_item( true, 4 ) ) );
-		parse_table[14].insert( make_pair( symbol( TK_MULT ), parse_table_item( true, 4 ) ) );
-		parse_table[14].insert( make_pair( symbol( TK_PLUS ), parse_table_item( true, 4 ) ) );
-		parse_table[14].insert( make_pair( symbol( TK_BRCL ), parse_table_item( true, 4 ) ) );
+		action_goto_table[14].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 4 ) ) );
+		action_goto_table[14].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 4 ) ) );
+		action_goto_table[14].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 4 ) ) );
+		action_goto_table[14].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 4 ) ) );
 	}
 
 public:
@@ -622,8 +623,8 @@ public:
 			return false;
 
 		LR_stack_item top = item_stack.back();
-		map< symbol, parse_table_item >::iterator it = parse_table[top.state].find( in );
-		if( it == parse_table[top.state].end() )
+		map< symbol, action_goto_table_item >::iterator it = action_goto_table[top.state].find( in );
+		if( it == action_goto_table[top.state].end() )
 		{
 			//optional:
 			//printf( "bad syntax, starting anew\n" );
@@ -632,7 +633,7 @@ public:
 			return false;
 		}
 
-		parse_table_item itm = it->second;
+		action_goto_table_item itm = it->second;
 		//TODO - add actual rule for accepting
 		if( itm.reduce_rule == -1 ) //flag for accepting
 		{
@@ -678,7 +679,7 @@ public:
 			LR_stack_item new_state;
 
 			new_state.insert_exp( rule.result_exp );
-			new_state.state = parse_table[old_state.state][rule.result_exp].new_state;
+			new_state.state = action_goto_table[old_state.state][rule.result_exp].new_state;
 			new_state.current_value = new_value;
 
 			item_stack.push_back( new_state );
