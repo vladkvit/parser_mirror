@@ -291,6 +291,8 @@ bool rule4_cbk( const list< LR_stack_item>& stk );
 
 bool rule5_cbk( const list< LR_stack_item>& stk );
 
+bool rule6_cbk( const list< LR_stack_item>& stk );
+
 class incremental_parser
 {
 public:
@@ -410,7 +412,7 @@ private:
 	void init_rules()
 	{
 		//the EBNF substitutions
-		rules.resize( 6 );
+		rules.resize( 7 );
 		rules[0].result_exp = EX_ADD;
 		rules[0].rhs.push_back( EX_MULT );
 		rules[0].callback = rule0_cbk;
@@ -440,6 +442,11 @@ private:
 		rules[5].result_exp = EX_VALUE;
 		rules[5].rhs.push_back( TK_BOOL );
 		rules[5].callback = rule5_cbk;
+
+		rules[6].result_exp = EX_S;
+		rules[6].rhs.push_back( EX_ADD );
+		rules[6].rhs.push_back( TK_END );
+		rules[6].callback = rule6_cbk;
 	}
 
 	unordered_multimap< nonterminals, int > build_lhs_rule_lookup() const
@@ -547,12 +554,9 @@ private:
 		//for every rule, take LHS. See if there's an entry in "first" - if there is, we've looked at the nonterminal before
 		//if we haven't - loop over every rule that has that nonterminal as LHS.
 
-		for( size_t i = 0; i < rules.size(); i++ )
+		for( size_t i = 0; i < all_nonterminals.size(); i++ )
 		{
-			symbol root_key = symbol( rules[i].result_exp );
-			if( first.count( root_key ) > 0 )
-				continue;
-
+			symbol root_key = symbol( all_nonterminals[i] );
 
 			//DFS the rules graph. 
 			unordered_set< nonterminals > visited; //hash for looking at visited nodes.
@@ -637,14 +641,9 @@ private:
 	{
 		unordered_multimap<nonterminals, tokens> follow;
 
-		//we're trying to iterate over every nonterminal
-		//for every rule
-		for( size_t i = 0; i < rules.size(); i++ )
+		for( size_t i = 0; i < all_nonterminals.size(); i++ )
 		{
-			symbol root_key = symbol( rules[i].result_exp );
-
-			if( follow.count( root_key.expr ) > 0 )
-				continue;
+			symbol root_key = symbol( all_nonterminals[i] );
 
 			//DFS the rules graph.
 			unordered_set< nonterminals > visited; //hash for looking at visited nodes.
@@ -880,6 +879,11 @@ bool rule4_cbk( const list< LR_stack_item>& stk )
 }
 
 bool rule5_cbk( const list< LR_stack_item>& stk )
+{
+	return stk.back().current_value.d_bool;
+}
+
+bool rule6_cbk( const list< LR_stack_item>& stk )
 {
 	return stk.back().current_value.d_bool;
 }
