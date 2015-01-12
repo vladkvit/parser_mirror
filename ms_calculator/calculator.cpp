@@ -41,18 +41,93 @@ void map_map_insert_helper( map<A, unordered_set<B>> &mp, const A &key, const B 
 }
 
 bool rule0_cbk( const list< LR_stack_item>& stk );
-
 bool rule1_cbk( const list< LR_stack_item>& stk );
-
 bool rule2_cbk( const list< LR_stack_item>& stk );
-
 bool rule3_cbk( const list< LR_stack_item>& stk );
-
 bool rule4_cbk( const list< LR_stack_item>& stk );
-
 bool rule5_cbk( const list< LR_stack_item>& stk );
-
 bool rule6_cbk( const list< LR_stack_item>& stk );
+
+class parser_action_goto_table_generator
+{
+
+public:
+	static void pregenerated_bool_calculator_table( vector< map< symbol, action_goto_table_item > >& action_goto_table )
+	{
+		assert( action_goto_table.size() == 0 );
+
+		int num_states = 15;
+		action_goto_table.resize( num_states );
+		action_goto_table[0].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, -1 ) ) );
+		action_goto_table[0].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
+		action_goto_table[0].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 5 ) ) );
+		action_goto_table[0].insert( make_pair( symbol( EX_ADD ), action_goto_table_item( false, 1 ) ) );
+		action_goto_table[0].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 2 ) ) );
+		action_goto_table[0].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 3 ) ) );
+
+		action_goto_table[1].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, -1 ) ) );
+
+		action_goto_table[2].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 0 ) ) );
+		action_goto_table[2].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( false, 6 ) ) );
+		action_goto_table[2].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 0 ) ) );
+
+		action_goto_table[3].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 2 ) ) );
+		action_goto_table[3].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( false, 7 ) ) );
+		action_goto_table[3].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 2 ) ) );
+		action_goto_table[3].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 2 ) ) );
+
+		action_goto_table[4].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
+		action_goto_table[4].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 12 ) ) );
+		action_goto_table[4].insert( make_pair( symbol( EX_ADD ), action_goto_table_item( false, 8 ) ) );
+		action_goto_table[4].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 10 ) ) );
+		action_goto_table[4].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 11 ) ) );
+
+		action_goto_table[5].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[5].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[5].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[5].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 5 ) ) );
+
+		action_goto_table[6].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
+		action_goto_table[6].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 12 ) ) );
+		action_goto_table[6].insert( make_pair( symbol( EX_ADD ), action_goto_table_item( false, 9 ) ) );
+		action_goto_table[6].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 10 ) ) );
+		action_goto_table[6].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 11 ) ) );
+
+		action_goto_table[7].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
+		action_goto_table[7].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 12 ) ) );
+		action_goto_table[7].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 13 ) ) );
+		action_goto_table[7].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 11 ) ) );
+
+		action_goto_table[8].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( false, 14 ) ) );
+
+		action_goto_table[9].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 1 ) ) );
+		action_goto_table[9].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 1 ) ) );
+
+		action_goto_table[10].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 0 ) ) );
+		action_goto_table[10].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( false, 6 ) ) );
+		action_goto_table[10].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 0 ) ) );
+
+		action_goto_table[11].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 2 ) ) );
+		action_goto_table[11].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( false, 7 ) ) );
+		action_goto_table[11].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 2 ) ) );
+		action_goto_table[11].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 2 ) ) );
+
+		action_goto_table[12].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[12].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[12].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 5 ) ) );
+		action_goto_table[12].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 5 ) ) );
+
+		action_goto_table[13].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 3 ) ) );
+		action_goto_table[13].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 3 ) ) );
+		action_goto_table[13].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 3 ) ) );
+		action_goto_table[13].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 3 ) ) );
+
+		action_goto_table[14].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 4 ) ) );
+		action_goto_table[14].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 4 ) ) );
+		action_goto_table[14].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 4 ) ) );
+		action_goto_table[14].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 4 ) ) );
+	}
+};
 
 class incremental_parser
 {
@@ -61,7 +136,7 @@ public:
 	bool errors;
 
 private:
-	static const int NUM_STATES = 15;
+
 
 	//simple SLR(1) parser. 
 
@@ -420,10 +495,6 @@ private:
 		return follow;
 	}
 
-	void calculate_action_goto_table()
-	{
-
-	}
 
 	void init_action_goto_table_fresh()
 	{
@@ -431,80 +502,11 @@ private:
 		unordered_multimap< symbol, pair< size_t, size_t > > rhs_accel = build_rhs_rule_lookup();
 		unordered_multimap< symbol, tokens > first = calculate_first_set( lhs_accel );
 		unordered_multimap< nonterminals, tokens > follow = calculate_follow_set( rhs_accel, first );
-		calculate_action_goto_table();
 	}
 
 	void init_action_goto_table_precalculated()
 	{
-		action_goto_table.resize( NUM_STATES );
-		action_goto_table[0].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, -1 ) ) );
-		action_goto_table[0].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
-		action_goto_table[0].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 5 ) ) );
-		action_goto_table[0].insert( make_pair( symbol( EX_ADD ), action_goto_table_item( false, 1 ) ) );
-		action_goto_table[0].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 2 ) ) );
-		action_goto_table[0].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 3 ) ) );
-
-		action_goto_table[1].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, -1 ) ) );
-
-		action_goto_table[2].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 0 ) ) );
-		action_goto_table[2].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( false, 6 ) ) );
-		action_goto_table[2].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 0 ) ) );
-
-		action_goto_table[3].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 2 ) ) );
-		action_goto_table[3].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( false, 7 ) ) );
-		action_goto_table[3].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 2 ) ) );
-		action_goto_table[3].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 2 ) ) );
-
-		action_goto_table[4].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
-		action_goto_table[4].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 12 ) ) );
-		action_goto_table[4].insert( make_pair( symbol( EX_ADD ), action_goto_table_item( false, 8 ) ) );
-		action_goto_table[4].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 10 ) ) );
-		action_goto_table[4].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 11 ) ) );
-
-		action_goto_table[5].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 5 ) ) );
-		action_goto_table[5].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 5 ) ) );
-		action_goto_table[5].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 5 ) ) );
-		action_goto_table[5].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 5 ) ) );
-
-		action_goto_table[6].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
-		action_goto_table[6].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 12 ) ) );
-		action_goto_table[6].insert( make_pair( symbol( EX_ADD ), action_goto_table_item( false, 9 ) ) );
-		action_goto_table[6].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 10 ) ) );
-		action_goto_table[6].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 11 ) ) );
-
-		action_goto_table[7].insert( make_pair( symbol( TK_BROP ), action_goto_table_item( false, 4 ) ) );
-		action_goto_table[7].insert( make_pair( symbol( TK_BOOL ), action_goto_table_item( false, 12 ) ) );
-		action_goto_table[7].insert( make_pair( symbol( EX_MULT ), action_goto_table_item( false, 13 ) ) );
-		action_goto_table[7].insert( make_pair( symbol( EX_VALUE ), action_goto_table_item( false, 11 ) ) );
-
-		action_goto_table[8].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( false, 14 ) ) );
-
-		action_goto_table[9].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 1 ) ) );
-		action_goto_table[9].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 1 ) ) );
-
-		action_goto_table[10].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 0 ) ) );
-		action_goto_table[10].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( false, 6 ) ) );
-		action_goto_table[10].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 0 ) ) );
-
-		action_goto_table[11].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 2 ) ) );
-		action_goto_table[11].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( false, 7 ) ) );
-		action_goto_table[11].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 2 ) ) );
-		action_goto_table[11].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 2 ) ) );
-
-		action_goto_table[12].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 5 ) ) );
-		action_goto_table[12].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 5 ) ) );
-		action_goto_table[12].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 5 ) ) );
-		action_goto_table[12].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 5 ) ) );
-
-		action_goto_table[13].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 3 ) ) );
-		action_goto_table[13].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 3 ) ) );
-		action_goto_table[13].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 3 ) ) );
-		action_goto_table[13].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 3 ) ) );
-
-		action_goto_table[14].insert( make_pair( symbol( TK_END ), action_goto_table_item( true, 4 ) ) );
-		action_goto_table[14].insert( make_pair( symbol( TK_MULT ), action_goto_table_item( true, 4 ) ) );
-		action_goto_table[14].insert( make_pair( symbol( TK_PLUS ), action_goto_table_item( true, 4 ) ) );
-		action_goto_table[14].insert( make_pair( symbol( TK_BRCL ), action_goto_table_item( true, 4 ) ) );
+		parser_action_goto_table_generator::pregenerated_bool_calculator_table( action_goto_table );
 	}
 
 public:
