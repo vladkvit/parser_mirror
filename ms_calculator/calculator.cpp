@@ -31,13 +31,54 @@ void map_map_insert_helper( map<A, unordered_set<B>> &mp, const A &key, const B 
 */
 
 
-bool rule0_cbk( const list< LR_stack_item>& stk );
-bool rule1_cbk( const list< LR_stack_item>& stk );
-bool rule2_cbk( const list< LR_stack_item>& stk );
-bool rule3_cbk( const list< LR_stack_item>& stk );
-bool rule4_cbk( const list< LR_stack_item>& stk );
-bool rule5_cbk( const list< LR_stack_item>& stk );
-bool rule6_cbk( const list< LR_stack_item>& stk );
+
+bool rule0_cbk( const list< LR_stack_item>& stk )
+{
+	return stk.back().current_value.d_bool;
+}
+
+bool rule1_cbk( const list< LR_stack_item>& stk )
+{
+	bool val1 = stk.back().current_value.d_bool;
+	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
+	prev_it++;//can't increment by more than 1 with lists
+	prev_it++;
+	bool val2 = prev_it->current_value.d_bool;
+	return val1 | val2;
+}
+
+bool rule2_cbk( const list< LR_stack_item>& stk )
+{
+	return stk.back().current_value.d_bool;
+}
+
+bool rule3_cbk( const list< LR_stack_item>& stk )
+{
+	bool val1 = stk.back().current_value.d_bool;
+	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
+	prev_it++;//can't increment by more than 1 with lists
+	prev_it++;
+	bool val2 = prev_it->current_value.d_bool;
+	return val1 & val2;
+
+}
+
+bool rule4_cbk( const list< LR_stack_item>& stk )
+{
+	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
+	prev_it++;
+	return prev_it->current_value.d_bool;
+}
+
+bool rule5_cbk( const list< LR_stack_item>& stk )
+{
+	return stk.back().current_value.d_bool;
+}
+
+bool rule6_cbk( const list< LR_stack_item>& stk )
+{
+	return stk.back().current_value.d_bool;
+}
 
 
 
@@ -302,53 +343,6 @@ public:
 };
 
 
-bool rule0_cbk( const list< LR_stack_item>& stk )
-{
-	return stk.back().current_value.d_bool;
-}
-
-bool rule1_cbk( const list< LR_stack_item>& stk )
-{
-	bool val1 = stk.back().current_value.d_bool;
-	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
-	prev_it++;//can't increment by more than 1 with lists
-	prev_it++;
-	bool val2 = prev_it->current_value.d_bool;
-	return val1 | val2;
-}
-
-bool rule2_cbk( const list< LR_stack_item>& stk )
-{
-	return stk.back().current_value.d_bool;
-}
-
-bool rule3_cbk( const list< LR_stack_item>& stk )
-{
-	bool val1 = stk.back().current_value.d_bool;
-	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
-	prev_it++;//can't increment by more than 1 with lists
-	prev_it++;
-	bool val2 = prev_it->current_value.d_bool;
-	return val1 & val2;
-
-}
-
-bool rule4_cbk( const list< LR_stack_item>& stk )
-{
-	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
-	prev_it++;
-	return prev_it->current_value.d_bool;
-}
-
-bool rule5_cbk( const list< LR_stack_item>& stk )
-{
-	return stk.back().current_value.d_bool;
-}
-
-bool rule6_cbk( const list< LR_stack_item>& stk )
-{
-	return stk.back().current_value.d_bool;
-}
 
 //on "bad" input, this function will return false.
 //one can check for parser.errors to see if input was parsed correctly
