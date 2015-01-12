@@ -122,11 +122,6 @@ struct action_goto_table_item
 	action_goto_table_item( bool sr, int st ) : shift_or_reduce( sr ), new_state( st ) {}
 };
 
-struct parser_state
-{
-	vector<int> symbol_positions;
-};
-
 template <typename A, typename B>
 void map_map_insert_helper( map<A, unordered_set<B>> &mp, const A &key, const B &item )
 {
@@ -164,7 +159,6 @@ private:
 	//simple SLR(1) parser. 
 
 	vector< parser_rule > rules;
-	list<parser_state> creating_action_goto_table_states;
 
 	list< LR_stack_item> item_stack; //using a list because we need access to all elements
 
