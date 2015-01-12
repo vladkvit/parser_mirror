@@ -1,4 +1,6 @@
 ﻿//defines enum tokens and enum nonterminals
+#pragma once
+
 #include <vector>
 #include <array>
 
