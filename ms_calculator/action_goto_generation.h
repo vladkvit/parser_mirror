@@ -25,6 +25,14 @@ struct parser_generation_state
 		}
 		return false;
 	}
+
+	bool operator == ( const parser_generation_state& other ) const
+	{
+		if( *this < other || other < *this )
+			return false;
+
+		return true;
+	}
 };
 
 
@@ -354,25 +362,25 @@ private:
 
 	static void calculate_states( const vector< parser_rule >& rules,
 		const unordered_multimap< nonterminals, int > &lhs_accel,
-		set<parser_generation_state>& good_states )
+		set<parser_generation_state*>& good_states )
 	{
 		const size_t number_of_rules = rules.size();
 
-		parser_generation_state initial_state;
-		initial_state.rule_position_map.insert( pair<int, int>( 0, 0 ) );
+		parser_generation_state* initial_state = new parser_generation_state();
+		initial_state->rule_position_map.insert( pair<int, int>( 0, 0 ) );
 
-		queue<parser_generation_state> bfs_queue;
+		queue<parser_generation_state*> bfs_queue;
 		bfs_queue.push( initial_state );
 
 		//while we have new possible states to analyze
 		while( bfs_queue.size() > 0 )
 		{
-			parser_generation_state inspect_state = bfs_queue.front();
+			parser_generation_state* inspect_state = bfs_queue.front();
 			bfs_queue.pop();
 
 			//expand state. state has rule ID and rhs position. For every rule in state, look at RHS
 			//e.g. if we have S->A, we want to have S->A; +A->B; +B->x
-			for( map<int, int>::const_iterator it = inspect_state.rule_position_map.begin(); it != inspect_state.rule_position_map.end(); ++it )
+			for( map<int, int>::const_iterator it = inspect_state->rule_position_map.begin(); it != inspect_state->rule_position_map.end(); ++it )
 			{
 				if( rules[it->first].rhs.size() <= it->second )
 					continue;
@@ -387,7 +395,7 @@ private:
 				for( unordered_set<int>::const_iterator it2 = new_set.begin(); it2 != new_set.end(); ++it2 )
 				{
 					bool found = false;
-					for( auto range = inspect_state.rule_position_map.equal_range( *it2 ); range.first != range.second; ++range.first )
+					for( auto range = inspect_state->rule_position_map.equal_range( *it2 ); range.first != range.second; ++range.first )
 					{
 						//The map does not guarantee uniqueness of key-value pairs. That's why we're checking if what we're about to insert already exists
 						if( range.first->second == 0 ) //the number of items already found for a rule. 
@@ -397,24 +405,36 @@ private:
 						}
 					}
 					if( !found )
-						inspect_state.rule_position_map.insert( make_pair( *it2, 0 ) );
+						inspect_state->rule_position_map.insert( make_pair( *it2, 0 ) );
 				}
 			}
 
 			//check if it's in good_states.
-			if( good_states.count( inspect_state ) )
+			bool found_state = false;
+			for( set<parser_generation_state*>::const_iterator good_states_finder = good_states.begin(); good_states_finder != good_states.end(); ++good_states_finder )
+			{
+				if( *inspect_state == **good_states_finder )
+				{
+					found_state = true;
+					break;
+				}
+			}
+			if( found_state )
+			{
+				delete inspect_state;
 				continue;
+			}
 
 			//if it isn't, push it into good_states and push all the children into queue
 			good_states.insert( inspect_state );
 			
 			//find new states by going through rules and trying to incrementing them
 			unordered_set<symbol> visited;
-			for( multimap<int, int>::iterator it = inspect_state.rule_position_map.begin(); it != inspect_state.rule_position_map.end(); ++it )
+			for( multimap<int, int>::iterator it = inspect_state->rule_position_map.begin(); it != inspect_state->rule_position_map.end(); ++it )
 			{
-				parser_generation_state new_state = inspect_state;
+				parser_generation_state* new_state = new parser_generation_state( *inspect_state);
 
-				multimap<int, int>::iterator it_new = new_state.rule_position_map.begin();
+				multimap<int, int>::iterator it_new = new_state->rule_position_map.begin();
 				while( true )
 				{
 					if( it_new->first == it->first && it_new->second == it->second )
@@ -434,7 +454,7 @@ private:
 				visited.insert( rules[it_new->first].rhs[it_new->second - 1] );
 
 				//we found a suitable rule to increment by a symbol. Go through the rest of the map and increment or remove all the other rules.
-				for( multimap<int, int>::iterator it2 = new_state.rule_position_map.begin(); it2 != new_state.rule_position_map.end(); )
+				for( multimap<int, int>::iterator it2 = new_state->rule_position_map.begin(); it2 != new_state->rule_position_map.end(); )
 				{
 					if( it2 == it_new )
 					{
@@ -447,7 +467,7 @@ private:
 					{
 						auto it2_new = it2;
 						it2_new++;
-						new_state.rule_position_map.erase( it2 ); //apparently map iterators are valid after map erase
+						new_state->rule_position_map.erase( it2 ); //apparently map iterators are valid after map erase
 						it2 = it2_new;
 
 						++it2;
@@ -463,12 +483,12 @@ private:
 					{
 						auto it2_new = it2;
 						it2_new++;
-						new_state.rule_position_map.erase( it2 ); //apparently map iterators are valid after map erase
+						new_state->rule_position_map.erase( it2 ); //apparently map iterators are valid after map erase
 						it2 = it2_new;
 						continue;
 					}
 
-					if( it2 != new_state.rule_position_map.end() )
+					if( it2 != new_state->rule_position_map.end() )
 						++it2;
 				}
 
@@ -478,14 +498,14 @@ private:
 	}
 public:
 
-	static void debug_print_states( const set<parser_generation_state> &states, const vector< parser_rule >& rules )
+	static void debug_print_states( const set<parser_generation_state*> &states, const vector< parser_rule >& rules )
 	{
 #ifdef DEBUG_PARSER
 		int i = 0;
-		for( set<parser_generation_state>::const_iterator it = states.begin(); it != states.end(); ++it, i++ )
+		for( set<parser_generation_state*>::const_iterator it = states.begin(); it != states.end(); ++it, i++ )
 		{
 			printf( "---State %d---\n", i );
-			for( multimap< int, int >::const_iterator it2 = it->rule_position_map.begin(); it2 != it->rule_position_map.end(); ++it2 )
+			for( multimap< int, int >::const_iterator it2 = (*it)->rule_position_map.begin(); it2 != (*it)->rule_position_map.end(); ++it2 )
 			{
 				//printf( "Rule %d, position %d\n", it2->first, it2->second );
 				printf( "%c -> ", debug_map[symbol( rules[it2->first].result_exp) ] );
@@ -521,7 +541,7 @@ public:
 		unordered_multimap< nonterminals, tokens > follow;
 		calculate_follow_set( rules, rhs_accel, first, follow );
 
-		set<parser_generation_state> states;
+		set<parser_generation_state*> states;
 		calculate_states( rules, lhs_accel, states );
 		debug_print_states( states, rules );
 		calculate_action_goto_table( rules, lhs_accel, follow );
