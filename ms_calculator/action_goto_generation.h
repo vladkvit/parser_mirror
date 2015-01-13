@@ -354,7 +354,7 @@ private:
 
 	static void calculate_states( const vector< parser_rule >& rules,
 		const unordered_multimap< nonterminals, int > &lhs_accel,
-		set<parser_generation_state>& states )
+		set<parser_generation_state>& good_states )
 	{
 		const size_t number_of_rules = rules.size();
 
@@ -401,13 +401,13 @@ private:
 				}
 			}
 
-			//check if it's in states.
-			if( states.count( inspect_state ) )
+			//check if it's in good_states.
+			if( good_states.count( inspect_state ) )
 				continue;
 
-			//if it isn't, push it into states and push all the children into queue
-			states.insert( inspect_state );
-
+			//if it isn't, push it into good_states and push all the children into queue
+			good_states.insert( inspect_state );
+			
 			//find new states by going through rules and trying to incrementing them
 			unordered_set<symbol> visited;
 			for( multimap<int, int>::iterator it = inspect_state.rule_position_map.begin(); it != inspect_state.rule_position_map.end(); ++it )
