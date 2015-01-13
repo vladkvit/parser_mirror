@@ -371,7 +371,7 @@ private:
 		const size_t number_of_rules = rules.size();
 
 		parser_generation_state initial_state;
-		initial_state.rule_position_map.insert( pair<int, int>( 0, 0 ) ); //TODO change to 0,0
+		initial_state.rule_position_map.insert( pair<int, int>( 0, 0 ) );
 
 		queue<parser_generation_state> bfs_queue;
 		bfs_queue.push( initial_state );
@@ -434,7 +434,6 @@ private:
 
 				it_new->second++;
 
-
 				if( it_new->second > rules[it_new->first].rhs.size() )
 					continue;
 
@@ -452,7 +451,6 @@ private:
 						continue;
 					}
 
-
 					//if a rule was already completed, remove it
 					if( it2->second >= rules[it2->first].rhs.size() )
 					{
@@ -464,7 +462,6 @@ private:
 						++it2;
 						continue;
 					}
-
 
 					//if a rule matches the symbol we're looking for
 					if( rules[it_new->first].rhs[it_new->second - 1] == rules[it2->first].rhs[it2->second] )
