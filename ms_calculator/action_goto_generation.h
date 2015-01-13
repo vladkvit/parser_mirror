@@ -366,7 +366,6 @@ private:
 
 	static void calculate_states( const vector< parser_rule >& rules,
 		const unordered_multimap< nonterminals, int > &lhs_accel,
-		const unordered_multimap< nonterminals, tokens > &follow,
 		set<parser_generation_state>& states )
 	{
 		const size_t number_of_rules = rules.size();
@@ -488,8 +487,6 @@ private:
 				bfs_queue.push( new_state );
 			}
 		}
-
-
 	}
 public:
 
@@ -516,7 +513,7 @@ public:
 		unordered_multimap< nonterminals, tokens > follow = calculate_follow_set( rules, rhs_accel, first );
 
 		set<parser_generation_state> states;
-		calculate_states( rules, lhs_accel, follow, states );
+		calculate_states( rules, lhs_accel, states );
 		debug_print_states( states );
 		calculate_action_goto_table( rules, lhs_accel, follow );
 	}
