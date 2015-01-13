@@ -143,22 +143,17 @@ private:
 		return;
 	}
 
-	static unordered_multimap< nonterminals, int > build_lhs_rule_lookup( const vector< parser_rule >& rules )
+	static void build_lhs_rule_lookup( const vector< parser_rule >& rules, unordered_multimap< nonterminals, int > &rule_accel )
 	{
-		unordered_multimap< nonterminals, int > rule_accel;
-
 		for( size_t i = 0; i < rules.size(); i++ )
 		{
 			rule_accel.insert( make_pair( rules[i].result_exp, i ) );
 		}
-		return rule_accel;
 	}
 
 	//returns a lookup table for a symbol to its position(s) in the RHS of rules
-	static unordered_multimap< symbol, pair<size_t, size_t> > build_rhs_rule_lookup( const vector< parser_rule >& rules )
+	static void build_rhs_rule_lookup( const vector< parser_rule >& rules, unordered_multimap< symbol, pair<size_t, size_t> > &rule_accel )
 	{
-		unordered_multimap< symbol, pair<size_t, size_t> > rule_accel;
-
 		for( size_t i = 0; i < rules.size(); i++ )
 		{
 			for( size_t j = 0; j < rules[i].rhs.size(); j++ )
@@ -166,7 +161,6 @@ private:
 				rule_accel.insert( make_pair( rules[i].rhs[j], pair<size_t, size_t>( i, j ) ) );
 			}
 		}
-		return rule_accel;
 	}
 
 	static unordered_set< tokens > calculate_first( const vector< parser_rule >& rules,
@@ -237,10 +231,8 @@ private:
 	//If we imagine the first set as a dependency graph, 
 	//finding the FIRST set an be thought of as finding all the destinations from every point
 	//lhs_accel outputs rule indeces when queried with the LHS of an expression
-	static unordered_multimap<symbol, tokens> calculate_first_set( const vector< parser_rule >& rules, const unordered_multimap< nonterminals, int > &lhs_accel )
+	static void calculate_first_set( const vector< parser_rule >& rules, const unordered_multimap< nonterminals, int > &lhs_accel, unordered_multimap<symbol, tokens> &first )
 	{
-		unordered_multimap<symbol, tokens> first;
-
 		//This implementation is the "naive foreach rule, do DFS" approach.
 		//For speedup, look into algorithms here: http://en.wikipedia.org/wiki/Reachability or implement Dynamic Programming
 
@@ -269,8 +261,6 @@ private:
 		{
 			first.insert( make_pair( symbol( all_terminals[i] ), all_terminals[i] ) );
 		}
-
-		return first;
 	}
 
 	static unordered_set< tokens > calculate_follow(
@@ -332,13 +322,12 @@ private:
 		return follow;
 	}
 
-	static unordered_multimap<nonterminals, tokens> calculate_follow_set(
+	static void calculate_follow_set(
 		const vector< parser_rule >& rules,
 		const unordered_multimap< symbol, pair<size_t, size_t> > &rhs_accel,
-		const unordered_multimap< symbol, tokens > &first )
+		const unordered_multimap< symbol, tokens > &first,
+		unordered_multimap<nonterminals, tokens> &follow )
 	{
-		unordered_multimap<nonterminals, tokens> follow;
-
 		for( size_t i = 0; i < all_nonterminals.size(); i++ )
 		{
 			symbol root_key = symbol( all_nonterminals[i] );
@@ -355,7 +344,6 @@ private:
 		}
 
 		assert( follow.size() > 0 );
-		return follow;
 	}
 
 	static void calculate_action_goto_table( const vector< parser_rule >& rules,
@@ -382,24 +370,27 @@ private:
 			parser_generation_state inspect_state = bfs_queue.front();
 			bfs_queue.pop();
 
-			//expand rule. state has rule ID and rhs position. For every rule in state, look at RHS
+			//expand state. state has rule ID and rhs position. For every rule in state, look at RHS
+			//e.g. if we have S->A, we want to have S->A; +A->B; +B->x
 			for( map<int, int>::const_iterator it = inspect_state.rule_position_map.begin(); it != inspect_state.rule_position_map.end(); ++it )
 			{
-				unordered_set<int> new_set;
 				if( rules[it->first].rhs.size() <= it->second )
 					continue;
 
 				if( rules[it->first].rhs[it->second].nonterm_or_tok )
 					continue;
 
+				unordered_set<int> new_set;
 				expand_rule( rules[it->first].rhs[it->second].expr, rules, lhs_accel, new_set );
+
+				//we have a list of new blank rules that we should add to the state.
 				for( unordered_set<int>::const_iterator it2 = new_set.begin(); it2 != new_set.end(); ++it2 )
 				{
 					bool found = false;
-					auto range = inspect_state.rule_position_map.equal_range( *it2 );
-					for( ; range.first != range.second; ++range.first )
+					for( auto range = inspect_state.rule_position_map.equal_range( *it2 ); range.first != range.second; ++range.first )
 					{
-						if( range.first->second == 0 ) //the number of items already found for a rule
+						//The map does not guarantee uniqueness of key-value pairs. That's why we're checking if what we're about to insert already exists
+						if( range.first->second == 0 ) //the number of items already found for a rule. 
 						{
 							found = true;
 							break;
@@ -456,7 +447,7 @@ private:
 					{
 						auto it2_new = it2;
 						it2_new++;
-						new_state.rule_position_map.erase( it2 ); //apparently map iterators are stable after map erase
+						new_state.rule_position_map.erase( it2 ); //apparently map iterators are valid after map erase
 						it2 = it2_new;
 
 						++it2;
@@ -472,7 +463,7 @@ private:
 					{
 						auto it2_new = it2;
 						it2_new++;
-						new_state.rule_position_map.erase( it2 ); //apparently map iterators are stable after map erase
+						new_state.rule_position_map.erase( it2 ); //apparently map iterators are valid after map erase
 						it2 = it2_new;
 						continue;
 					}
@@ -504,10 +495,14 @@ public:
 	{
 		assert( action_goto_table.size() == 0 );
 
-		unordered_multimap< nonterminals, int > lhs_accel = build_lhs_rule_lookup( rules );
-		unordered_multimap< symbol, pair< size_t, size_t > > rhs_accel = build_rhs_rule_lookup( rules );
-		unordered_multimap< symbol, tokens > first = calculate_first_set( rules, lhs_accel );
-		unordered_multimap< nonterminals, tokens > follow = calculate_follow_set( rules, rhs_accel, first );
+		unordered_multimap< nonterminals, int > lhs_accel;
+		build_lhs_rule_lookup( rules, lhs_accel );
+		unordered_multimap< symbol, pair< size_t, size_t > > rhs_accel;
+		build_rhs_rule_lookup( rules, rhs_accel );
+		unordered_multimap< symbol, tokens > first;
+		calculate_first_set( rules, lhs_accel, first );
+		unordered_multimap< nonterminals, tokens > follow;
+		calculate_follow_set( rules, rhs_accel, first, follow );
 
 		set<parser_generation_state> states;
 		calculate_states( rules, lhs_accel, states );
