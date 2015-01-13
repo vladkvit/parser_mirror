@@ -60,7 +60,6 @@ bool rule3_cbk( const list< LR_stack_item>& stk )
 	prev_it++;
 	bool val2 = prev_it->current_value.d_bool;
 	return val1 & val2;
-
 }
 
 bool rule4_cbk( const list< LR_stack_item>& stk )
