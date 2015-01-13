@@ -1,6 +1,8 @@
 ﻿//defines enum tokens and enum nonterminals
 #pragma once
 
+#define DEBUG_PARSER
+
 #include <vector>
 #include <array>
 

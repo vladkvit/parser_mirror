@@ -478,17 +478,34 @@ private:
 	}
 public:
 
-	static void debug_print_states( const set<parser_generation_state> &states )
+	static void debug_print_states( const set<parser_generation_state> &states, const vector< parser_rule >& rules )
 	{
+#ifdef DEBUG_PARSER
 		int i = 0;
 		for( set<parser_generation_state>::const_iterator it = states.begin(); it != states.end(); ++it, i++ )
 		{
 			printf( "---State %d---\n", i );
 			for( multimap< int, int >::const_iterator it2 = it->rule_position_map.begin(); it2 != it->rule_position_map.end(); ++it2 )
 			{
-				printf( "Rule %d, position %d\n", it2->first, it2->second );
+				//printf( "Rule %d, position %d\n", it2->first, it2->second );
+				printf( "%c -> ", debug_map[symbol( rules[it2->first].result_exp) ] );
+
+				int j = 0;
+				for( ; j < rules[it2->first].rhs.size(); j++ )
+				{
+					if( j == it2->second )
+						printf( ". " );
+
+					printf( "%c ", debug_map[rules[it2->first].rhs[j] ] );
+				}
+				if( j == it2->second )
+					printf( ". " );
+
+				printf( "\n" );
 			}
+			printf( "\n" );
 		}
+#endif
 	}
 
 	static void init_action_goto_table_fresh( const vector< parser_rule >& rules, vector< map< symbol, action_goto_table_item > >& action_goto_table )
@@ -506,7 +523,7 @@ public:
 
 		set<parser_generation_state> states;
 		calculate_states( rules, lhs_accel, states );
-		debug_print_states( states );
+		debug_print_states( states, rules );
 		calculate_action_goto_table( rules, lhs_accel, follow );
 	}
 };

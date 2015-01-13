@@ -98,8 +98,8 @@ private:
 	list< LR_stack_item> item_stack; //using a list because we need access to all elements
 
 #ifdef DEBUG_PARSER
-	unordered_map< tokens, char > debug_map;
-	unordered_map< nonterminals, char > debug_map2;
+
+
 #endif
 
 	//unordered_map could be substituted to improve performance
@@ -114,9 +114,10 @@ private:
 #ifdef DEBUG_PARSER
 		for( list<LR_stack_item>::iterator it = item_stack.begin(); it != item_stack.end(); ++it )
 		{
+			printf( "%c", debug_map[it->smb] );
+			
 			if( it->smb.nonterm_or_tok )
 			{
-				printf( "%c", debug_map[it->smb.tk] );
 				if( it->smb.tk == TK_BOOL )
 				{
 					printf( "%d", it->current_value );
@@ -124,7 +125,10 @@ private:
 			}
 			else
 			{
-				printf( "%c-%d-%d", debug_map2[it->smb.expr], it->current_value, it->state );
+				if( it->current_value.type != DT_NONE )
+					printf( "-%d", it->current_value  );
+				
+				printf( "-%d", it->state );
 			}
 			printf( " " );
 		}
@@ -178,23 +182,6 @@ private:
 	{
 		item_stack.push_back( to_insert );
 		debug_print_arr();
-	}
-
-	void init_debug_map()
-	{
-#ifdef DEBUG_PARSER
-		debug_map.insert( make_pair( TK_PLUS, '+' ) );
-		debug_map.insert( make_pair( TK_MULT, '*' ) );
-		debug_map.insert( make_pair( TK_BOOL, 'B' ) );
-		debug_map.insert( make_pair( TK_BROP, '(' ) );
-		debug_map.insert( make_pair( TK_BRCL, ')' ) );
-		debug_map.insert( make_pair( TK_END, '$' ) );
-
-		debug_map2.insert( make_pair( EX_VALUE, 'V' ) );
-		debug_map2.insert( make_pair( EX_MULT, 'M' ) );
-		debug_map2.insert( make_pair( EX_ADD, 'A' ) );
-		debug_map2.insert( make_pair( EX_EMPTY, '\\' ) );
-#endif
 	}
 
 	void init_rules()

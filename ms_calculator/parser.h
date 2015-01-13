@@ -114,3 +114,25 @@ struct action_goto_table_item
 			new_state = st;
 	}
 };
+
+#ifdef DEBUG_PARSER
+unordered_map< symbol, char > debug_map;
+#endif
+
+void init_debug_map()
+{
+#ifdef DEBUG_PARSER
+	debug_map.insert( make_pair( symbol( TK_PLUS), '+' ) );
+	debug_map.insert( make_pair( symbol( TK_MULT), '*' ) );
+	debug_map.insert( make_pair( symbol( TK_BOOL), 'B' ) );
+	debug_map.insert( make_pair( symbol( TK_BROP), '(' ) );
+	debug_map.insert( make_pair( symbol( TK_BRCL), ')' ) );
+	debug_map.insert( make_pair( symbol( TK_END), '$' ) );
+
+	debug_map.insert( make_pair( symbol( EX_VALUE), 'V' ) );
+	debug_map.insert( make_pair( symbol( EX_MULT), 'M' ) );
+	debug_map.insert( make_pair( symbol( EX_ADD), 'A' ) );
+	debug_map.insert( make_pair( symbol( EX_EMPTY), '\\' ) );
+	debug_map.insert( make_pair( symbol( EX_S), 'S' ) );
+#endif
+}
