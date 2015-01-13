@@ -106,5 +106,11 @@ struct action_goto_table_item
 	};
 
 	action_goto_table_item() {}
-	action_goto_table_item( bool sr, int st ) : shift_or_reduce( sr ), new_state( st ) {}
+	action_goto_table_item( bool sr, int st ) : shift_or_reduce( sr )
+	{
+		if( sr )
+			reduce_rule = st;
+		else
+			new_state = st;
+	}
 };
