@@ -237,9 +237,6 @@ private:
 		rules[6].callback = rule6_cbk;
 	}
 
-
-
-
 	void init_action_goto_table_fresh()
 	{
 		parser_action_goto_table_generator::init_action_goto_table_fresh( rules, action_goto_table );

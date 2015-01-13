@@ -94,3 +94,17 @@ struct parser_rule
 	vector<symbol> rhs;
 	bool( *callback )( const list< LR_stack_item>& );
 };
+
+//state machine helper
+struct action_goto_table_item
+{
+	bool shift_or_reduce; //false=shift, true=reduce
+	union
+	{
+		int new_state;
+		int reduce_rule;
+	};
+
+	action_goto_table_item() {}
+	action_goto_table_item( bool sr, int st ) : shift_or_reduce( sr ), new_state( st ) {}
+};

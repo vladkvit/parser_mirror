@@ -1,19 +1,32 @@
 #pragma once
 #include "parser.h"
 
-//state machine helper
-struct action_goto_table_item
+//action-goto table generation needs to keep track of states
+struct parser_generation_state
 {
-	bool shift_or_reduce; //false=shift, true=reduce
-	union
-	{
-		int new_state;
-		int reduce_rule;
-	};
+	multimap< int, int > rule_position_map;
 
-	action_goto_table_item() {}
-	action_goto_table_item( bool sr, int st ) : shift_or_reduce( sr ), new_state( st ) {}
+	bool operator < ( const parser_generation_state& other ) const
+	{
+		map< int, int >::const_iterator it1 = rule_position_map.begin();
+		map< int, int >::const_iterator it2 = other.rule_position_map.begin();
+		
+		if( rule_position_map.size() != other.rule_position_map.size() )
+			return rule_position_map.size() < other.rule_position_map.size();
+
+		for( ; it1 != rule_position_map.end(); ++it1, ++it2 )
+		{
+			if( it1->first != it2->first )
+				return it1->first < it2->first;
+
+			if( it1->second != it2->second )
+				return it1->second < it2->second;
+
+		}
+		return false;
+	}
 };
+
 
 class parser_action_goto_table_generator
 {
@@ -96,6 +109,39 @@ public:
 	}
 
 private:
+	//given a nonterminal, finds all the nonterminal FIRSTs and the corresponding rules of that nonterminal.
+	static void expand_rule( symbol in, const vector< parser_rule >& rules, 
+		const unordered_multimap< nonterminals, int > &lhs_accel,
+		unordered_set<int> &rule_set )
+	{
+		if( in.nonterm_or_tok )
+			return;
+
+		queue<nonterminals> to_expand;
+		unordered_set<nonterminals> visited; //technically we could check using rule_set, but having a "visited" simplifies the code
+		to_expand.push( in.expr );
+		while( to_expand.size() > 0 )
+		{
+			nonterminals e = to_expand.front();
+			to_expand.pop();
+
+			if( visited.count( e ) )
+				continue;
+
+			visited.insert( e );
+
+			pair<unordered_multimap< nonterminals, int >::const_iterator,
+				unordered_multimap< nonterminals, int >::const_iterator> window = lhs_accel.equal_range( e );
+
+			for( ; window.first != window.second; ++window.first )
+			{
+				rule_set.insert( window.first->second );
+				if( rules[window.first->second].rhs[0].nonterm_or_tok == false )
+					to_expand.push( rules[window.first->second].rhs[0].expr );
+			}
+		}
+		return;
+	}
 
 	static unordered_multimap< nonterminals, int > build_lhs_rule_lookup( const vector< parser_rule >& rules )
 	{
@@ -312,8 +358,138 @@ private:
 		return follow;
 	}
 
-	static void calculate_action_goto_table()
+	static void calculate_action_goto_table( const vector< parser_rule >& rules,
+		const unordered_multimap< nonterminals, int > &lhs_accel,
+		const unordered_multimap< nonterminals, tokens > &follow )
 	{
+	}
+
+	static void calculate_states( const vector< parser_rule >& rules, 
+		const unordered_multimap< nonterminals, int > &lhs_accel,
+		const unordered_multimap< nonterminals, tokens > &follow,
+		set<parser_generation_state>& states )
+	{
+		const size_t number_of_rules = rules.size();
+		
+		parser_generation_state initial_state;
+		initial_state.rule_position_map.insert(pair<int,int>(6,0)); //TODO change to 0,0
+
+		queue<parser_generation_state> bfs_queue;
+		bfs_queue.push( initial_state );
+
+		//while we have new possible states to analyze
+		while( bfs_queue.size() > 0 )
+		{
+			parser_generation_state inspect_state = bfs_queue.front();
+			bfs_queue.pop();
+
+			//expand rule. state has rule ID and rhs position. For every rule in state, look at RHS
+			for( map<int, int>::const_iterator it = inspect_state.rule_position_map.begin(); it != inspect_state.rule_position_map.end(); ++it )
+			{
+				unordered_set<int> new_set;
+				if( rules[it->first].rhs.size() <= it->second )
+					continue;
+
+				if( rules[it->first].rhs[it->second].nonterm_or_tok )
+					continue;
+
+				expand_rule( rules[it->first].rhs[it->second].expr, rules, lhs_accel, new_set );
+				for( unordered_set<int>::const_iterator it2 = new_set.begin(); it2 != new_set.end(); ++it2 )
+				{
+					bool found = false;
+					auto range = inspect_state.rule_position_map.equal_range( *it2 );
+					for( ; range.first != range.second; ++range.first )
+					{
+						if( range.first->second == 0 ) //the number of items already found for a rule
+						{
+							found = true;
+							break;
+						}
+					}
+					if( !found )
+						inspect_state.rule_position_map.insert( make_pair(*it2, 0) );
+				}
+			}
+
+			//check if it's in states.
+			if( states.count( inspect_state ) )
+				continue;
+
+			//if it isn't, push it into states and push all the children into queue
+			states.insert( inspect_state );
+			
+			//find new states by going through rules and trying to incrementing them
+			unordered_set<symbol> visited;
+			for( multimap<int, int>::iterator it = inspect_state.rule_position_map.begin(); it != inspect_state.rule_position_map.end(); ++it )
+			{
+				parser_generation_state new_state = inspect_state;
+
+				multimap<int, int>::iterator it_new = new_state.rule_position_map.begin();
+				while( true )
+				{
+					if( it_new->first == it->first && it_new->second == it->second )
+						break;
+					
+					++it_new;
+				}
+
+				it_new->second++;
+
+				
+				if( it_new->second > rules[it_new->first].rhs.size() )
+					continue;
+				
+				if( visited.count( rules[it_new->first].rhs[it_new->second -1] ) )
+					continue;
+
+				visited.insert( rules[it_new->first].rhs[it_new->second - 1] );
+
+				//we found a suitable rule to increment by a symbol. Go through the rest of the map and increment or remove all the other rules.
+				for( multimap<int, int>::iterator it2 = new_state.rule_position_map.begin(); it2 != new_state.rule_position_map.end();  )
+				{
+					if( it2 == it_new )
+					{
+						++it2;
+						continue;
+					}
+						
+
+					//if a rule was already completed, remove it
+					if( it2->second >= rules[it2->first].rhs.size() )
+					{
+						auto it2_new = it2;
+						it2_new++;
+						new_state.rule_position_map.erase( it2 ); //apparently map iterators are stable after map erase
+						it2 = it2_new;
+
+						++it2;
+						continue;
+					}
+
+
+					//if a rule matches the symbol we're looking for
+					if( rules[it_new->first].rhs[it_new->second - 1] == rules[it2->first].rhs[it2->second] )
+					{
+						it2->second++;
+					}
+					else //remove it otherwise
+					{
+						auto it2_new = it2;
+						it2_new++;
+						new_state.rule_position_map.erase( it2 ); //apparently map iterators are stable after map erase
+						it2 = it2_new;
+						continue;
+					}
+
+					if( it2 != new_state.rule_position_map.end() )
+						++it2;
+				}
+
+				bfs_queue.push( new_state );
+			}
+		}
+
+		
 	}
 public:
 	static void init_action_goto_table_fresh( const vector< parser_rule >& rules, vector< map< symbol, action_goto_table_item > >& action_goto_table )
@@ -324,6 +500,9 @@ public:
 		unordered_multimap< symbol, pair< size_t, size_t > > rhs_accel = build_rhs_rule_lookup( rules );
 		unordered_multimap< symbol, tokens > first = calculate_first_set( rules, lhs_accel );
 		unordered_multimap< nonterminals, tokens > follow = calculate_follow_set( rules, rhs_accel, first );
-		calculate_action_goto_table();
+		
+		set<parser_generation_state> states;
+		calculate_states( rules, lhs_accel, follow, states );
+		calculate_action_goto_table( rules, lhs_accel, follow );
 	}
 };
