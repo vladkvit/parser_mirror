@@ -362,7 +362,8 @@ private:
 
 	static void calculate_states( const vector< parser_rule >& rules,
 		const unordered_multimap< nonterminals, int > &lhs_accel,
-		set<parser_generation_state*>& good_states )
+		set<parser_generation_state*>& good_states,
+		multimap< parser_generation_state*, parser_generation_state* >& children )
 	{
 		const size_t number_of_rules = rules.size();
 
@@ -371,6 +372,8 @@ private:
 
 		queue<parser_generation_state*> bfs_queue;
 		bfs_queue.push( initial_state );
+
+		multimap< parser_generation_state*, parser_generation_state* > parents;
 
 		//while we have new possible states to analyze
 		while( bfs_queue.size() > 0 )
@@ -422,6 +425,8 @@ private:
 			if( found_state )
 			{
 				delete inspect_state;
+				parents.erase( inspect_state );
+
 				continue;
 			}
 
@@ -445,13 +450,21 @@ private:
 
 				it_new->second++;
 
-				if( it_new->second > rules[it_new->first].rhs.size() )
+				if( it_new->second > rules[it_new->first].rhs.size() ) //rule outside bounds
+				{
+					delete new_state;
 					continue;
+				}
 
-				if( visited.count( rules[it_new->first].rhs[it_new->second - 1] ) )
+				if( visited.count( rules[it_new->first].rhs[it_new->second - 1] ) ) //already tried incrementing by this symbol
+				{
+					delete new_state;
 					continue;
+				}
 
 				visited.insert( rules[it_new->first].rhs[it_new->second - 1] );
+
+				parents.insert( make_pair( new_state, inspect_state ) );
 
 				//we found a suitable rule to increment by a symbol. Go through the rest of the map and increment or remove all the other rules.
 				for( multimap<int, int>::iterator it2 = new_state->rule_position_map.begin(); it2 != new_state->rule_position_map.end(); )
@@ -495,19 +508,25 @@ private:
 				bfs_queue.push( new_state );
 			}
 		}
+
+		for( multimap< parser_generation_state*, parser_generation_state* >::const_iterator parents_it = parents.begin(); parents_it != parents.end(); ++parents_it )
+		{
+			children.insert( make_pair( parents_it->second, parents_it->first ) );
+		}
 	}
 public:
 
-	static void debug_print_states( const set<parser_generation_state*> &states, const vector< parser_rule >& rules )
+	static void debug_print_states( const set<parser_generation_state*> &states, 
+		const vector< parser_rule >& rules, 
+		multimap< parser_generation_state*, parser_generation_state* >& children )
 	{
 #ifdef DEBUG_PARSER
 		int i = 0;
 		for( set<parser_generation_state*>::const_iterator it = states.begin(); it != states.end(); ++it, i++ )
 		{
-			printf( "---State %d---\n", i );
+			printf( "---State %d / %X---\n", i, *it );
 			for( multimap< int, int >::const_iterator it2 = (*it)->rule_position_map.begin(); it2 != (*it)->rule_position_map.end(); ++it2 )
 			{
-				//printf( "Rule %d, position %d\n", it2->first, it2->second );
 				printf( "%c -> ", debug_map[symbol( rules[it2->first].result_exp) ] );
 
 				int j = 0;
@@ -522,7 +541,14 @@ public:
 					printf( ". " );
 
 				printf( "\n" );
+
 			}
+			printf( "Children states are :" );
+			for( auto children_range = children.equal_range( *it ); children_range.first != children_range.second; ++children_range.first )
+			{
+				printf( "%X ", children_range.first->second );
+			}
+			printf( "\n" );
 			printf( "\n" );
 		}
 #endif
@@ -542,8 +568,9 @@ public:
 		calculate_follow_set( rules, rhs_accel, first, follow );
 
 		set<parser_generation_state*> states;
-		calculate_states( rules, lhs_accel, states );
-		debug_print_states( states, rules );
+		multimap< parser_generation_state*, parser_generation_state* > children;
+		calculate_states( rules, lhs_accel, states, children );
+		debug_print_states( states, rules, children );
 		calculate_action_goto_table( rules, lhs_accel, follow );
 	}
 };
