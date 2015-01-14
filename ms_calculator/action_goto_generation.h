@@ -429,6 +429,7 @@ private:
 			good_states.insert( inspect_state );
 			
 			//find new states by going through rules and trying to incrementing them
+			//TODO: split this up into two parts: finding symbols to increment, put them into a map, then make a new state.
 			unordered_set<symbol> visited;
 			for( multimap<int, int>::iterator it = inspect_state->rule_position_map.begin(); it != inspect_state->rule_position_map.end(); ++it )
 			{
@@ -553,8 +554,31 @@ public:
 	static void calculate_action_goto_table( const vector< parser_rule >& rules,
 		const unordered_multimap< nonterminals, int > &lhs_accel,
 		const unordered_multimap< nonterminals, tokens > &follow,
-		multimap< parser_generation_state*, parser_generation_state* > &children )
+		const multimap< parser_generation_state*, parser_generation_state* > &children,
+		const set<parser_generation_state*>& states,
+		vector< map< symbol, action_goto_table_item > >& action_goto_table )
 	{
+		//note: the starting state needs to be at position 0
+
+		//for every state, there needs to be a lookup for any input symbol
+		int state_number = 0;
+		for( set<parser_generation_state*>::const_iterator state_set_it = states.begin(); state_set_it != states.end(); ++state_set_it, state_number++ )
+		{
+			//first, find all the shifts
+			for( auto children_range = children.equal_range( *state_set_it ); children_range.first != children_range.second; ++children_range.first )
+			{
+				//get the way we got to the new state
+				//children_range.first.second
+
+				//now, insert it into the action goto table
+				//action_goto_table[ state_number ].insert
+			}
+
+			//next, find all the reduces. This is done using follows
+			
+			
+		}
+
 
 	}
 
@@ -575,6 +599,6 @@ public:
 		multimap< parser_generation_state*, parser_generation_state* > children;
 		calculate_states( rules, lhs_accel, states, children );
 		debug_print_states( states, rules, children );
-		calculate_action_goto_table( rules, lhs_accel, follow, children );
+		calculate_action_goto_table( rules, lhs_accel, follow, children, states, action_goto_table );
 	}
 };
