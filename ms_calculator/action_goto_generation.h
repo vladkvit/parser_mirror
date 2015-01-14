@@ -354,11 +354,6 @@ private:
 		assert( follow.size() > 0 );
 	}
 
-	static void calculate_action_goto_table( const vector< parser_rule >& rules,
-		const unordered_multimap< nonterminals, int > &lhs_accel,
-		const unordered_multimap< nonterminals, tokens > &follow )
-	{
-	}
 
 	static void calculate_states( const vector< parser_rule >& rules,
 		const unordered_multimap< nonterminals, int > &lhs_accel,
@@ -554,6 +549,15 @@ public:
 #endif
 	}
 
+
+	static void calculate_action_goto_table( const vector< parser_rule >& rules,
+		const unordered_multimap< nonterminals, int > &lhs_accel,
+		const unordered_multimap< nonterminals, tokens > &follow,
+		multimap< parser_generation_state*, parser_generation_state* > &children )
+	{
+
+	}
+
 	static void init_action_goto_table_fresh( const vector< parser_rule >& rules, vector< map< symbol, action_goto_table_item > >& action_goto_table )
 	{
 		assert( action_goto_table.size() == 0 );
@@ -571,6 +575,6 @@ public:
 		multimap< parser_generation_state*, parser_generation_state* > children;
 		calculate_states( rules, lhs_accel, states, children );
 		debug_print_states( states, rules, children );
-		calculate_action_goto_table( rules, lhs_accel, follow );
+		calculate_action_goto_table( rules, lhs_accel, follow, children );
 	}
 };
