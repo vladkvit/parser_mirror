@@ -564,7 +564,42 @@ public:
 		int state_number = 0;
 		for( set<parser_generation_state*>::const_iterator state_set_it = states.begin(); state_set_it != states.end(); ++state_set_it, state_number++ )
 		{
-			//first, find all the shifts
+			//if there is an item A->a. then reduce for all terminals that are in FOLLOW(A)
+			//if there is an item A->a.b, and there is a child that is produced through adding b, then shift to that child
+
+			//find the reduces
+			bool found_completed_production = false;
+
+			//Note that this is a map and not a multimap, since this is an SLR parser. An LR parser would be able to differentiate between reductions,
+			//but an SLR parser cannot resolve this particular type of reduce/reduce conflicts.
+			map<nonterminals, int> completed_production_results; //maps the production LHS to the rule number.
+			//looking through each production in the state item
+			for( multimap<int, int>::const_iterator production_it = ( *state_set_it )->rule_position_map.begin(); production_it != ( *state_set_it )->rule_position_map.end(); ++production_it )
+			{
+				//if the production is "finished", then this state can be reduced upon seeing a new token
+				if( production_it->second >= rules[production_it->first].rhs.size() )
+				{
+					found_completed_production = true;
+					completed_production_results.insert( make_pair(rules[production_it->first].result_exp, production_it->first ) );
+				}
+			}
+			//if there is a reducible production, then set a reduce for all the follows. NOTE: this is what distinguishes an LR(1) parser from an SLR(1) parser.
+			//An LR(1) parser would be looking at the follow nonterminals specific to this production, not the general FOLLOW_SET.
+			if( found_completed_production )
+			{
+				assert( completed_production_results.size() > 0 );
+
+				//Completed rules generate nonterminals. For each such nonterminal, find the follows and insert a reduce rule.
+				for( auto completed_symb_it = completed_production_results.begin(); completed_symb_it != completed_production_results.end(); ++completed_symb_it )
+				{
+					for( auto follow_range = follow.equal_range( completed_symb_it->first ); follow_range.first != follow_range.second; ++follow_range.first )
+					{
+						//insert into rule: completed_symb_it->second, symbol completed_symb_it->first, reduction by rule follow_range
+					}
+				}
+			}
+
+			//find the shifts
 			for( auto children_range = children.equal_range( *state_set_it ); children_range.first != children_range.second; ++children_range.first )
 			{
 				//get the way we got to the new state
