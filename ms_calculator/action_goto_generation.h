@@ -572,10 +572,14 @@ public:
 	{
 		//note: the starting state needs to be at position 0
 
+		action_goto_table.resize( states.size() );
+
 		//for every state, there needs to be a lookup for any input symbol
 		int state_number = 0;
 		for( vector<parser_generation_state*>::const_iterator state_set_it = states.begin(); state_set_it != states.end(); ++state_set_it, state_number++ )
 		{
+			assert( state_number == distance( states.begin(), state_set_it  ) );
+
 			//if there is an item A->a. then reduce for all terminals that are in FOLLOW(A)
 			//if there is an item A->a.b, and there is a child that is produced through adding b, then shift to that child
 
@@ -606,26 +610,62 @@ public:
 				{
 					for( auto follow_range = follow.equal_range( completed_symb_it->first ); follow_range.first != follow_range.second; ++follow_range.first )
 					{
-						//insert into rule: completed_symb_it->second, symbol completed_symb_it->first, reduction by rule follow_range
+						//TODO - check for reduce-reduce conflicts when multiple different symbols have the same FOLLOW
+						//insert a reduction rule.
+						action_goto_table[distance( states.begin(), state_set_it ) ].insert( make_pair( follow_range.first->second, action_goto_table_item( true, completed_symb_it->second ) ) );
 					}
 				}
 			}
 
 			//find the shifts
-			for( auto children_range = children.equal_range( distance( state_set_it, states.begin() ) ); children_range.first != children_range.second; ++children_range.first )
+			for( auto children_range = children.equal_range( distance( states.begin(), state_set_it ) ); children_range.first != children_range.second; ++children_range.first )
 			{
+				//children_range.first is the first iterator. It contains pair<int,pair<int,symbol>> - pair<parent,pair<child,symbol>>
+
 				//get the way we got to the new state
-				//children_range.first.second
+				//children_range.first->second
 
 				//now, insert it into the action goto table
-				//action_goto_table[ state_number ].insert
+				action_goto_table[ distance( states.begin(), state_set_it ) ].insert( make_pair( children_range.first->second.second, action_goto_table_item( false, children_range.first->second.first) ) );
 			}
 
-			//next, find all the reduces. This is done using follows
+
 			
 			
 		}
 
+
+	}
+
+	static void prettyprint_action_goto_item( const action_goto_table_item& item )
+	{
+		if( item.shift_or_reduce ) //reduce
+		{
+			printf( "r%d", item.reduce_rule );
+		}
+		else
+		{
+			printf( "s%d", item.new_state);
+		}
+	}
+
+	static void prettyprint_action_goto_table( const vector< map< symbol, action_goto_table_item > >& action_goto_table )
+	{
+		for( int i = 0; i < action_goto_table.size(); i++ )
+		{
+			printf( "%d: ", i );
+			for( auto it = action_goto_table[i].begin(); it != action_goto_table[i].end(); ++it )
+			{
+				printf( "%c -> ", debug_map[it->first] );
+				prettyprint_action_goto_item( it->second );
+				printf( ", " );
+			}
+			printf( "\n" );
+		}
+	}
+
+	static void prettyprint_follow( const unordered_multimap< nonterminals, tokens > &follow )
+	{
 
 	}
 
@@ -641,11 +681,13 @@ public:
 		calculate_first_set( rules, lhs_accel, first );
 		unordered_multimap< nonterminals, tokens > follow;
 		calculate_follow_set( rules, rhs_accel, first, follow );
+		prettyprint_follow( follow );
 
 		vector<parser_generation_state*> states;
 		multimap< int, pair<int, symbol> > children;
 		calculate_states( rules, lhs_accel, states, children );
 		debug_print_states( states, rules, children );
 		calculate_action_goto_table( rules, lhs_accel, follow, children, states, action_goto_table );
+		prettyprint_action_goto_table( action_goto_table );
 	}
 };
