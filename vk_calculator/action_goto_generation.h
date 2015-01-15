@@ -5,12 +5,12 @@
 //action-goto table generation needs to keep track of states
 struct parser_generation_state
 {
-	multimap< int, int > rule_position_map;
+	multimap< size_t, size_t > rule_position_map;
 
 	bool operator < ( const parser_generation_state& other ) const
 	{
-		map< int, int >::const_iterator it1 = rule_position_map.begin();
-		map< int, int >::const_iterator it2 = other.rule_position_map.begin();
+		map< size_t, size_t >::const_iterator it1 = rule_position_map.begin();
+		map< size_t, size_t >::const_iterator it2 = other.rule_position_map.begin();
 
 		if( rule_position_map.size() != other.rule_position_map.size() )
 			return rule_position_map.size() < other.rule_position_map.size();
@@ -381,7 +381,7 @@ private:
 
 			//expand state. state has rule ID and rhs position. For every rule in state, look at RHS
 			//e.g. if we have S->A, we want to have S->A; +A->B; +B->x
-			for( map<int, int>::const_iterator it = inspect_state->rule_position_map.begin(); it != inspect_state->rule_position_map.end(); ++it )
+			for( map<size_t, size_t>::const_iterator it = inspect_state->rule_position_map.begin(); it != inspect_state->rule_position_map.end(); ++it )
 			{
 				if( rules[it->first].rhs.size() <= it->second )
 					continue;
@@ -442,11 +442,11 @@ private:
 			//find new states by going through rules and trying to incrementing them
 			//TODO: split this up into two parts: finding symbols to increment, put them into a map, then make a new state.
 			unordered_set<symbol> visited;
-			for( multimap<int, int>::iterator it = inspect_state->rule_position_map.begin(); it != inspect_state->rule_position_map.end(); ++it )
+			for( multimap<size_t, size_t>::iterator it = inspect_state->rule_position_map.begin(); it != inspect_state->rule_position_map.end(); ++it )
 			{
 				parser_generation_state* new_state = new parser_generation_state( *inspect_state);
 
-				multimap<int, int>::iterator it_new = new_state->rule_position_map.begin();
+				multimap<size_t, size_t>::iterator it_new = new_state->rule_position_map.begin();
 				while( true )
 				{
 					if( it_new->first == it->first && it_new->second == it->second )
@@ -474,7 +474,7 @@ private:
 				parents.insert( make_pair( new_state, make_pair(inspect_state, rules[it_new->first].rhs[it_new->second - 1] )) );
 
 				//we found a suitable rule to increment by a symbol. Go through the rest of the map and increment or remove all the other rules.
-				for( multimap<int, int>::iterator it2 = new_state->rule_position_map.begin(); it2 != new_state->rule_position_map.end(); )
+				for( multimap<size_t, size_t>::iterator it2 = new_state->rule_position_map.begin(); it2 != new_state->rule_position_map.end(); )
 				{
 					if( it2 == it_new )
 					{
@@ -530,14 +530,14 @@ public:
 		multimap< int, pair<int, symbol> >& children )
 	{
 #ifdef DEBUG_PARSER
-		for( int i = 0; i < states.size(); i++ )
+		for( size_t i = 0; i < states.size(); i++ )
 		{
 			printf( "---State %d / %X---\n", i, states[i] );
-			for( multimap< int, int >::const_iterator it2 = states[i]->rule_position_map.begin(); it2 != states[i]->rule_position_map.end(); ++it2 )
+			for( multimap< size_t, size_t >::const_iterator it2 = states[i]->rule_position_map.begin(); it2 != states[i]->rule_position_map.end(); ++it2 )
 			{
 				printf( "%c -> ", debug_map[symbol( rules[it2->first].result_exp) ] );
 
-				int j = 0;
+				size_t j = 0;
 				for( ; j < rules[it2->first].rhs.size(); j++ )
 				{
 					if( j == it2->second )
@@ -591,7 +591,7 @@ public:
 			//but an SLR parser cannot resolve this particular type of reduce/reduce conflicts.
 			map<nonterminals, int> completed_production_results; //maps the production LHS to the rule number.
 			//looking through each production in the state item
-			for( multimap<int, int>::const_iterator production_it = ( *state_set_it )->rule_position_map.begin(); production_it != ( *state_set_it )->rule_position_map.end(); ++production_it )
+			for( multimap<size_t, size_t>::const_iterator production_it = ( *state_set_it )->rule_position_map.begin(); production_it != ( *state_set_it )->rule_position_map.end(); ++production_it )
 			{
 				//if the production is "finished", then this state can be reduced upon seeing a new token
 				if( production_it->second >= rules[production_it->first].rhs.size() )
@@ -652,7 +652,7 @@ public:
 
 	static void prettyprint_action_goto_table( const vector< map< symbol, action_goto_table_item > >& action_goto_table )
 	{
-		for( int i = 0; i < action_goto_table.size(); i++ )
+		for( size_t i = 0; i < action_goto_table.size(); i++ )
 		{
 			printf( "%d: ", i );
 			for( auto it = action_goto_table[i].begin(); it != action_goto_table[i].end(); ++it )
