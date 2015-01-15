@@ -1,5 +1,7 @@
 #pragma once
 #include "lexer.h"
+#include "user_nonterminals.h"
+
 
 //it's convenient to have a datatype that can represent either a terminal or a nonterminal
 struct symbol
@@ -114,4 +116,48 @@ struct action_goto_table_item
 		else
 			new_state = st;
 	}
+};
+
+
+//simple LR(1) parser. 
+class incremental_parser
+{
+public:
+	bool final_value;
+	bool errors;
+
+private:
+
+	vector< parser_rule > rules;
+	list< LR_stack_item> item_stack; //using a list because we need access to all elements
+	vector< map< symbol, action_goto_table_item > > action_goto_table;
+	map< symbol, tokens > follow_table;
+	int offset_state;
+
+	void debug_print_arr();
+
+public:
+	incremental_parser();
+
+private:
+
+	void init_stack();
+
+	void shift( LR_stack_item to_insert );
+
+	void init_rules();
+
+	void init_action_goto_table_fresh();
+
+	void init_action_goto_table_precalculated();
+
+public:
+
+	void clear();
+
+	//for every new input token, run parser(). This is a helper function
+	bool parser_t( symbol in, data_t data );
+
+	//run for every token from the lexer
+	void parser( token in );
 };
