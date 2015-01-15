@@ -119,17 +119,17 @@ private:
 			{
 				if( it->smb.tk == TK_BOOL )
 				{
-					printf( "%d", it->current_value );
+					printf( "%d.b", it->current_value );
 				}
 			}
 			else
 			{
 				if( it->current_value.type != DT_NONE )
-					printf( "-%d", it->current_value  );
+					printf( " %d.b", it->current_value  );
 				
-				printf( "-%d", it->state );
+				printf( " %d", it->state );
 			}
-			printf( " " );
+			printf( ", " );
 		}
 		printf( "\n" );
 #endif
@@ -161,7 +161,7 @@ public:
 
 		init_action_goto_table_fresh();
 
-		init_action_goto_table_precalculated();
+		//init_action_goto_table_precalculated();
 
 		clear();
 	}
