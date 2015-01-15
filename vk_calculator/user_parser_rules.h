@@ -24,7 +24,6 @@ void init_debug_map()
 #endif
 }
 
-
 bool rule0_cbk( const list< LR_stack_item>& stk )
 {
 	return stk.back().current_value.d_bool;
@@ -70,4 +69,44 @@ bool rule5_cbk( const list< LR_stack_item>& stk )
 bool rule6_cbk( const list< LR_stack_item>& stk )
 {
 	return stk.back().current_value.d_bool;
+}
+
+static void user_rules( vector< parser_rule >& rules )
+{
+	//the EBNF substitutions
+	rules.resize( 7 );
+	rules[0].result_exp = EX_S;
+	rules[0].rhs.push_back( EX_ADD );
+	rules[0].rhs.push_back( TK_END );
+	rules[0].callback = rule6_cbk;
+
+	rules[1].result_exp = EX_ADD;
+	rules[1].rhs.push_back( EX_MULT );
+	rules[1].callback = rule0_cbk;
+
+	rules[2].result_exp = EX_ADD;
+	rules[2].rhs.push_back( EX_MULT );
+	rules[2].rhs.push_back( TK_PLUS );
+	rules[2].rhs.push_back( EX_ADD );
+	rules[2].callback = rule1_cbk;
+
+	rules[3].result_exp = EX_MULT;
+	rules[3].rhs.push_back( EX_VALUE );
+	rules[3].callback = rule2_cbk;
+
+	rules[4].result_exp = EX_MULT;
+	rules[4].rhs.push_back( EX_VALUE );
+	rules[4].rhs.push_back( TK_MULT );
+	rules[4].rhs.push_back( EX_MULT );
+	rules[4].callback = rule3_cbk;
+
+	rules[5].result_exp = EX_VALUE;
+	rules[5].rhs.push_back( TK_BROP );
+	rules[5].rhs.push_back( EX_ADD );
+	rules[5].rhs.push_back( TK_BRCL );
+	rules[5].callback = rule4_cbk;
+
+	rules[6].result_exp = EX_VALUE;
+	rules[6].rhs.push_back( TK_BOOL );
+	rules[6].callback = rule5_cbk;
 }
