@@ -1,7 +1,7 @@
 #pragma once
 
 #include "stdafx.h"
-#include "tokens_states_rules.h"
+#include "user_lex_rules.h"
 
 using namespace std;
 
@@ -103,13 +103,7 @@ class incremental_lexer
 public:
 	incremental_lexer()
 	{
-		token_map.insert( make_pair( '+', TK_PLUS ) );
-		token_map.insert( make_pair( '*', TK_MULT ) );
-		token_map.insert( make_pair( '0', TK_BOOL ) );
-		token_map.insert( make_pair( '1', TK_BOOL ) );
-		token_map.insert( make_pair( '(', TK_BROP ) );
-		token_map.insert( make_pair( ')', TK_BRCL ) );
-		token_map.insert( make_pair( '\n', TK_END ) );
+		lexer_rules( token_map );
 	}
 
 	void clear()

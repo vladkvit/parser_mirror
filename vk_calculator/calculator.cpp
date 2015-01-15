@@ -1,10 +1,11 @@
 #include "stdafx.h"
 
 //should have enum tokens, enum nonterminals
-#include "tokens_states_rules.h"
+#include "user_nonterminals.h"
 #include "lexer.h"
 #include "parser.h"
 #include "action_goto_generation.h"
+#include "user_parser_rules.h"
 
 //Boolean math expression evaluator, implemented as an SLR(1) parser
 //Goals: easy to switch reading from cin to files
@@ -29,55 +30,6 @@ void map_map_insert_helper( map<A, unordered_set<B>> &mp, const A &key, const B 
 	itx->second.insert( item );
 }
 */
-
-
-
-bool rule0_cbk( const list< LR_stack_item>& stk )
-{
-	return stk.back().current_value.d_bool;
-}
-
-bool rule1_cbk( const list< LR_stack_item>& stk )
-{
-	bool val1 = stk.back().current_value.d_bool;
-	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
-	prev_it++;//can't increment by more than 1 with lists
-	prev_it++;
-	bool val2 = prev_it->current_value.d_bool;
-	return val1 | val2;
-}
-
-bool rule2_cbk( const list< LR_stack_item>& stk )
-{
-	return stk.back().current_value.d_bool;
-}
-
-bool rule3_cbk( const list< LR_stack_item>& stk )
-{
-	bool val1 = stk.back().current_value.d_bool;
-	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
-	prev_it++;//can't increment by more than 1 with lists
-	prev_it++;
-	bool val2 = prev_it->current_value.d_bool;
-	return val1 & val2;
-}
-
-bool rule4_cbk( const list< LR_stack_item>& stk )
-{
-	list< LR_stack_item>::const_reverse_iterator prev_it = stk.rbegin();
-	prev_it++;
-	return prev_it->current_value.d_bool;
-}
-
-bool rule5_cbk( const list< LR_stack_item>& stk )
-{
-	return stk.back().current_value.d_bool;
-}
-
-bool rule6_cbk( const list< LR_stack_item>& stk )
-{
-	return stk.back().current_value.d_bool;
-}
 
 
 
@@ -149,7 +101,7 @@ public:
 		//MULT -> VALUE | VALUE * MULT
 		//VALUE -> ( ADD ) | bool
 
-		//This expands to 15 SLR states. 
+		//This expands to 13 SLR states. 
 		//The states and the transitions are stored in action_goto_table
 		//For deriving state transitions, see SLR parse table derivation
 
@@ -157,7 +109,7 @@ public:
 
 		init_debug_map();
 
-		init_rules();
+		init_rules(); //EBNF rules
 
 		init_action_goto_table_fresh();
 

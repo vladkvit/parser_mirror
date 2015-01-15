@@ -1,5 +1,6 @@
 #pragma once
 #include "parser.h"
+#include "user_parser_rules.h"
 
 //action-goto table generation needs to keep track of states
 struct parser_generation_state

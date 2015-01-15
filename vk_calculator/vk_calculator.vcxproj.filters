@@ -33,6 +33,15 @@
     <ClInclude Include="action_goto_generation.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="user_lex_rules.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="user_parser_rules.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="user_nonterminals.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -42,9 +51,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="calculator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="tokens_states_rules.h">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
