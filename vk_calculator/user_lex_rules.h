@@ -2,6 +2,9 @@
 
 #include <regex>
 #include <unordered_map>
+#include <array>
+
+using namespace std;
 
 //TODO: switch the enums to enum classes
 //terminal symbols
@@ -20,7 +23,7 @@ enum tokens
 const std::array<tokens, 7> all_terminals = { TK_PLUS,TK_MULT,TK_BOOL,TK_BROP,TK_BRCL,TK_END,TK_EPSILON };
 
 //For now, it just matches characters.
-void lexer_rules( unordered_map< char, tokens >& token_map )
+static void lexer_rules( unordered_map< char, tokens >& token_map )
 {
 	token_map.insert( make_pair( '+', TK_PLUS ) );
 	token_map.insert( make_pair( '*', TK_MULT ) );
