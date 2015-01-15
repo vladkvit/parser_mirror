@@ -358,7 +358,7 @@ private:
 	static void calculate_states( const vector< parser_rule >& rules,
 		const unordered_multimap< nonterminals, int > &lhs_accel,
 		vector<parser_generation_state*>& good_states,
-		multimap< int, int >& children )
+		multimap< int, pair<int, symbol> >& children )
 	{
 		const size_t number_of_rules = rules.size();
 
@@ -368,7 +368,7 @@ private:
 		queue<parser_generation_state*> bfs_queue;
 		bfs_queue.push( initial_state );
 
-		multimap< parser_generation_state*, parser_generation_state* > parents;
+		multimap< parser_generation_state*, pair<parser_generation_state*,symbol> > parents;
 
 		unordered_map< parser_generation_state*, int> rule_pointer_to_index;
 
@@ -470,7 +470,7 @@ private:
 
 				visited.insert( rules[it_new->first].rhs[it_new->second - 1] );
 
-				parents.insert( make_pair( new_state, inspect_state ) );
+				parents.insert( make_pair( new_state, make_pair(inspect_state, rules[it_new->first].rhs[it_new->second - 1] )) );
 
 				//we found a suitable rule to increment by a symbol. Go through the rest of the map and increment or remove all the other rules.
 				for( multimap<int, int>::iterator it2 = new_state->rule_position_map.begin(); it2 != new_state->rule_position_map.end(); )
@@ -515,18 +515,18 @@ private:
 			}
 		}
 
-		for( multimap< parser_generation_state*, parser_generation_state* >::const_iterator parents_it = parents.begin(); parents_it != parents.end(); ++parents_it )
+		for( auto parents_it = parents.begin(); parents_it != parents.end(); ++parents_it )
 		{
 			int rule_num_child = rule_pointer_to_index.find( parents_it->first )->second;
-			int rule_num_parent = rule_pointer_to_index.find( parents_it->second )->second;
-			children.insert( make_pair( rule_num_parent, rule_num_child ) );
+			int rule_num_parent = rule_pointer_to_index.find( parents_it->second.first )->second;
+			children.insert( make_pair( rule_num_parent, make_pair(rule_num_child, parents_it->second.second ) ));
 		}
 	}
 public:
 
 	static void debug_print_states( const vector<parser_generation_state*> &states, 
 		const vector< parser_rule >& rules, 
-		multimap< int, int >& children )
+		multimap< int, pair<int, symbol> >& children )
 	{
 #ifdef DEBUG_PARSER
 		for( int i = 0; i < states.size(); i++ )
@@ -553,7 +553,8 @@ public:
 			printf( "Children states are :" );
 			for( auto children_range = children.equal_range( i ); children_range.first != children_range.second; ++children_range.first )
 			{
-				printf( "%d ", children_range.first->second );
+				printf( "%c-", debug_map[children_range.first->second.second] );
+				printf( "%d, ", children_range.first->second.first );
 			}
 			printf( "\n" );
 			printf( "\n" );
@@ -565,7 +566,7 @@ public:
 	static void calculate_action_goto_table( const vector< parser_rule >& rules,
 		const unordered_multimap< nonterminals, int > &lhs_accel,
 		const unordered_multimap< nonterminals, tokens > &follow,
-		const multimap< int, int > &children,
+		const multimap< int, pair<int, symbol> > &children,
 		const vector<parser_generation_state*>& states,
 		vector< map< symbol, action_goto_table_item > >& action_goto_table )
 	{
@@ -642,7 +643,7 @@ public:
 		calculate_follow_set( rules, rhs_accel, first, follow );
 
 		vector<parser_generation_state*> states;
-		multimap< int, int > children;
+		multimap< int, pair<int, symbol> > children;
 		calculate_states( rules, lhs_accel, states, children );
 		debug_print_states( states, rules, children );
 		calculate_action_goto_table( rules, lhs_accel, follow, children, states, action_goto_table );
