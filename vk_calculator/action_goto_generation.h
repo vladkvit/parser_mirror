@@ -41,6 +41,7 @@ class parser_action_goto_table_generator
 {
 
 public:
+	//TO ANYONE SKIMMING THROUGH. The real action-goto generation is below. This hard-coded action-goto table is here just for testing
 	static void pregenerated_bool_calculator_table( vector< map< symbol, action_goto_table_item > >& action_goto_table )
 	{
 		assert( action_goto_table.size() == 0 );
