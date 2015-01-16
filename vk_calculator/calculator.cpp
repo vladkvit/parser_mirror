@@ -92,7 +92,7 @@ int _tmain( int argc, _TCHAR* argv[] )
 			{
 				printf( "Invalid input\n" );
 			}
-			else if( !parser.fully_reduced )
+			else if( !parser.accepted )
 			{
 				printf( "Incomplete or invalid input\n" );
 			}

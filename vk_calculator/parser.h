@@ -125,7 +125,7 @@ class incremental_parser
 public:
 	bool final_value;
 	bool errors;
-	bool fully_reduced;
+	bool accepted;
 
 private:
 
