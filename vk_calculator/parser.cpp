@@ -32,6 +32,7 @@ void incremental_parser::debug_print_arr()
 incremental_parser::incremental_parser()
 {
 	offset_state = 0;
+	fully_reduced = false;
 
 	//EBNF right-recursive notation.
 	//I'm assuming the typical algebraic operator precedence:
@@ -164,6 +165,13 @@ bool incremental_parser::parser_t( symbol in, data_t data )
 		new_state.current_value = new_value;
 
 		item_stack.push_back( new_state );
+
+		//TODO make this nicer. Technically, the state lookup above finds garbage, although it will never be used.
+		if( new_state.smb == symbol( EX_S ) && item_stack.size() == 2 )
+		{
+			fully_reduced = true;
+			reduced = false;
+		}
 
 		debug_print_arr();
 	}

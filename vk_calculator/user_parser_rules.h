@@ -77,7 +77,7 @@ static void user_rules( vector< parser_rule >& rules )
 	rules.resize( 7 );
 	rules[0].result_exp = EX_S;
 	rules[0].rhs.push_back( EX_ADD );
-	rules[0].rhs.push_back( TK_END );
+	//rules[0].rhs.push_back( TK_END );
 	rules[0].callback = rule6_cbk;
 
 	rules[1].result_exp = EX_ADD;

@@ -286,6 +286,11 @@ private:
 
 		visited.insert( NT );
 
+		if( NT == EX_S )
+		{
+			follow.insert( TK_END );
+		}
+
 		//find out where in the rules on the RHS the nonterminal occurs
 		pair<unordered_multimap< symbol, pair< size_t, size_t> >::const_iterator,
 			unordered_multimap< symbol, pair< size_t, size_t> >::const_iterator> range = rhs_accel.equal_range( NT );
@@ -337,6 +342,9 @@ private:
 		const unordered_multimap< symbol, tokens > &first,
 		unordered_multimap<nonterminals, tokens> &follow )
 	{
+		assert( rules[0].result_exp == EX_S );
+		assert( (rules[0].rhs.back() == symbol( TK_END )) == false ); //the TK_END is implied and should not be included in the rules
+
 		for( size_t i = 0; i < all_nonterminals.size(); i++ )
 		{
 			symbol root_key = symbol( all_nonterminals[i] );
@@ -530,6 +538,8 @@ public:
 		multimap< int, pair<int, symbol> >& children )
 	{
 #ifdef DEBUG_PARSER
+		printf( "Generated parser states\n" );
+
 		for( size_t i = 0; i < states.size(); i++ )
 		{
 			printf( "---State %d / %X---\n", i, states[i] );
@@ -667,7 +677,12 @@ public:
 
 	static void prettyprint_follow( const unordered_multimap< nonterminals, tokens > &follow )
 	{
-
+		printf( "Follow set\n" );
+		for( auto it = follow.begin(); it != follow.end(); ++it )
+		{
+			printf( "%c %c, ", debug_map[symbol( it->first )], debug_map[symbol( it->second )] );
+		}
+		printf( "\n" );
 	}
 
 	static void init_action_goto_table_fresh( const vector< parser_rule >& rules, vector< map< symbol, action_goto_table_item > >& action_goto_table )

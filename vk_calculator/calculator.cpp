@@ -88,13 +88,18 @@ int _tmain( int argc, _TCHAR* argv[] )
 
 		if( c == '\n' )
 		{
-			if( !parser.errors )
+			if( parser.errors )
 			{
-				printf( "Result is %d\n", parser.final_value );
+				printf( "Invalid input\n" );
+			}
+			else if( !parser.fully_reduced )
+			{
+				printf( "Incomplete or invalid input\n" );
 			}
 			else
 			{
-				printf( "Invalid input\n" );
+				printf( "Result is %d\n", parser.final_value );
+				
 			}
 			lex.clear();
 			parser.clear();
