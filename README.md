@@ -10,6 +10,6 @@ This is a simple parser generator written in C++ without any external libraries.
  * This project is meant for learning, as opposed to using it in production.
  * Only tested with Visual Studio 2015.
 
-## Coming soon, maybe ###
+### Coming soon, maybe ###
  * A fancier lexer with user-defined token data structures
  * LR(0) and LR(1) parsing.
