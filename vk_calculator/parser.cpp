@@ -2,10 +2,10 @@
 #include "user_parser_rules.h"
 #include "action_goto_generation.h"
  
-void incremental_parser::debug_print_arr()
+void incremental_parser::debug_print_arr() const
 {
 #ifdef DEBUG_PARSER
-	for( list<LR_stack_item>::iterator it = item_stack.begin(); it != item_stack.end(); ++it )
+	for( list<LR_stack_item>::const_iterator it = item_stack.begin(); it != item_stack.end(); ++it )
 	{
 		printf( "%c", debug_map[it->smb] );
 		printf( "-%d", it->state );

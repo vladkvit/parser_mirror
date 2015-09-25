@@ -135,7 +135,7 @@ private:
 	map< symbol, tokens > follow_table;
 	int offset_state;
 
-	void debug_print_arr();
+	void debug_print_arr() const;
 
 public:
 	incremental_parser();

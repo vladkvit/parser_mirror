@@ -71,14 +71,14 @@ int _tmain( int argc, _TCHAR* argv[] )
 
 	printf( "Enter X to exit\n" );
 
-	for( char c = getchar();; c = getchar() )
+	for( int c = getchar();; c = getchar() )
 	{
-		if( c == 'X' )
+		if( c == 'X' || c == EOF )
 		{
 			break;
 		}
 
-		possible_token t = lex.lexer( c );
+		possible_token t = lex.lexer( (char)c );
 		if( !t.has_token )
 		{
 			continue;
