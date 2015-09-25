@@ -543,7 +543,7 @@ public:
 
 		for( size_t i = 0; i < states.size(); i++ )
 		{
-			printf( "---State %d / %X---\n", i, states[i] );
+			printf( "---State %d / %p---\n", i, states[i] );
 			for( multimap< size_t, size_t >::const_iterator it2 = states[i]->rule_position_map.begin(); it2 != states[i]->rule_position_map.end(); ++it2 )
 			{
 				printf( "%c -> ", debug_map[symbol( rules[it2->first].result_exp) ] );
